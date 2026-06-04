@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Disparo al Mono – Simulación Física</title>
+  <meta name="description" content="Simulación interactiva del experimento de física 'Disparo al Mono' (Shoot the Monkey) con movimiento parabólico y caída libre." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ===== VARIABLES Y RESET ===== */
+    :root {
+      --fondo-principal: #0d1117;
+      --fondo-panel:     #161b22;
+      --fondo-control:   #21262d;
+      --borde:           #30363d;
+      --acento:          #58a6ff;
+      --acento-hover:    #79bbff;
+      --verde:           #3fb950;
+      --rojo:            #f85149;
+      --amarillo:        #e3b341;
+      --texto-primario:  #e6edf3;
+      --texto-secundario:#8b949e;
+      --radio:           10px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--fondo-principal);
+      color: var(--texto-primario);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+      gap: 20px;
+    }
+
+    /* ===== CABECERA ===== */
+    header {
+      text-align: center;
+      max-width: 900px;
+    }
+
+    header h1 {
+      font-size: clamp(1.4rem, 4vw, 2.2rem);
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--acento), #a371f7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 6px;
+    }
+
+    header p {
+      color: var(--texto-secundario);
+      font-size: 0.9rem;
+      font-weight: 300;
+    }
+
+    /* ===== CONTENEDOR PRINCIPAL ===== */
+    .contenedor-principal {
+      display: flex;
+      gap: 20px;
+      width: 100%;
+      max-width: 1200px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    /* ===== PANEL DE CONTROLES ===== */
+    .panel-controles {
+      background: var(--fondo-panel);
+      border: 1px solid var(--borde);
+      border-radius: var(--radio);
+      padding: 20px;
+      width: 280px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .panel-controles h2 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--texto-secundario);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid var(--borde);
+      padding-bottom: 10px;
+    }
+
+    /* ===== GRUPOS DE CONTROLES ===== */
+    .grupo-control {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .etiqueta-control {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .etiqueta-control label {
+      font-size: 0.88rem;
+      color: var(--texto-primario);
+    }
+
+    .valor-control {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--acento);
+      background: var(--fondo-control);
+      padding: 2px 8px;
+      border-radius: 5px;
+      min-width: 60px;
+      text-align: right;
+    }
+
+    /* ===== SLIDERS ===== */
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: var(--borde);
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--acento);
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+      box-shadow: 0 0 6px rgba(88, 166, 255, 0.5);
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: var(--acento-hover);
+      transform: scale(1.2);
+    }
+
+    /* ===== BOTONES ===== */
+    .grupo-botones {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .boton {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.1s, opacity 0.2s, box-shadow 0.2s;
+      letter-spacing: 0.3px;
+    }
+
+    .boton:active { transform: scale(0.97); }
+
+    .boton-pausar {
+      background: var(--amarillo);
+      color: #000;
+    }
+
+    .boton-pausar:hover {
+      opacity: 0.9;
+      box-shadow: 0 0 12px rgba(227, 179, 65, 0.4);
+    }
+
+    .boton-reiniciar {
+      background: var(--rojo);
+      color: #fff;
+    }
+
+    .boton-reiniciar:hover {
+      opacity: 0.9;
+      box-shadow: 0 0 12px rgba(248, 81, 73, 0.4);
+    }
+
+    /* ===== PANEL DE DATOS ===== */
+    .panel-datos {
+      background: var(--fondo-panel);
+      border: 1px solid var(--borde);
+      border-radius: var(--radio);
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .panel-datos h2 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--texto-secundario);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid var(--borde);
+      padding-bottom: 10px;
+    }
+
+    .dato-fila {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 0.85rem;
+    }
+
+    .dato-etiqueta { color: var(--texto-secundario); }
+
+    .dato-valor {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--verde);
+    }
+
+    /* ===== CANVAS ===== */
+    .contenedor-canvas {
+      position: relative;
+      flex: 1;
+      min-width: 300px;
+    }
+
+    canvas {
+      display: block;
+      border-radius: var(--radio);
+      border: 1px solid var(--borde);
+      background: #0a0f14;
+      width: 100%;
+      height: auto;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    /* ===== MENSAJE DE IMPACTO ===== */
+    #mensajeImpacto {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: linear-gradient(135deg, rgba(63, 185, 80, 0.95), rgba(46, 160, 67, 0.95));
+      color: #fff;
+      font-size: clamp(1.1rem, 3vw, 1.6rem);
+      font-weight: 700;
+      padding: 20px 36px;
+      border-radius: 14px;
+      text-align: center;
+      border: 2px solid rgba(255,255,255,0.3);
+      box-shadow: 0 0 40px rgba(63, 185, 80, 0.6);
+      animation: pulsarImpacto 0.8s ease-in-out infinite alternate;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    #mensajeImpacto span {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 400;
+      opacity: 0.85;
+      margin-top: 4px;
+    }
+
+    @keyframes pulsarImpacto {
+      from { transform: translate(-50%, -50%) scale(1);   box-shadow: 0 0 30px rgba(63,185,80,0.5); }
+      to   { transform: translate(-50%, -50%) scale(1.04); box-shadow: 0 0 60px rgba(63,185,80,0.8); }
+    }
+
+    /* ===== PIE DE PÁGINA ===== */
+    footer {
+      color: var(--texto-secundario);
+      font-size: 0.78rem;
+      text-align: center;
+      padding-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========== CABECERA ========== -->
+  <header>
+    <h1>Disparo al Mono</h1>
+    <p>Simulación del experimento clásico de física: movimiento parabólico vs. caída libre</p>
+  </header>
+
+  <!-- ========== LAYOUT PRINCIPAL ========== -->
+  <div class="contenedor-principal">
+
+    <!-- ---- Panel de Controles ---- -->
+    <div class="panel-controles">
+      <h2>Parámetros</h2>
+
+      <!-- Velocidad inicial -->
+      <div class="grupo-control">
+        <div class="etiqueta-control">
+          <label for="sliderVelocidad">Velocidad inicial (v₀)</label>
+          <span class="valor-control" id="valorVelocidad">25 m/s</span>
+        </div>
+        <input type="range" id="sliderVelocidad" min="5" max="60" value="25" step="1" />
+      </div>
+
+      <!-- Distancia horizontal al mono -->
+      <div class="grupo-control">
+        <div class="etiqueta-control">
+          <label for="sliderDistanciaX">Distancia horizontal (X<sub>mono</sub>)</label>
+          <span class="valor-control" id="valorDistanciaX">400 px</span>
+        </div>
+        <input type="range" id="sliderDistanciaX" min="150" max="650" value="400" step="10" />
+      </div>
+
+      <!-- Altura del mono -->
+      <div class="grupo-control">
+        <div class="etiqueta-control">
+          <label for="sliderAlturaY">Altura del mono (Y<sub>mono</sub>)</label>
+          <span class="valor-control" id="valorAlturaY">280 px</span>
+        </div>
+        <input type="range" id="sliderAlturaY" min="80" max="380" value="280" step="10" />
+      </div>
+
+      <h2>Controles</h2>
+      <div class="grupo-botones">
+        <button class="boton boton-pausar"    id="botonPausar">Pausar</button>
+        <button class="boton boton-reiniciar" id="botonReiniciar">Reiniciar</button>
+      </div>
+
+      <!-- Datos en tiempo real -->
+      <div class="panel-datos">
+        <h2>Datos en Tiempo Real</h2>
+        <div class="dato-fila">
+          <span class="dato-etiqueta">Ángulo θ</span>
+          <span class="dato-valor" id="datoAngulo">—</span>
+        </div>
+        <div class="dato-fila">
+          <span class="dato-etiqueta">Tiempo t</span>
+          <span class="dato-valor" id="datoTiempo">—</span>
+        </div>
+        <div class="dato-fila">
+          <span class="dato-etiqueta">Distancia</span>
+          <span class="dato-valor" id="datoDistancia">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- Canvas ---- -->
+    <div class="contenedor-canvas">
+      <canvas id="lienzo" width="750" height="480"></canvas>
+      <div id="mensajeImpacto">
+        ¡Impacto Detectado!
+        <span>El proyectil alcanzó al mono</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ========== PIE ========== -->
+  <footer>
+    La gravedad afecta por igual al proyectil y al mono — por eso siempre se encuentran 🎓
+  </footer>
+
+  <!-- ========== JAVASCRIPT ========== -->
+  <script>
+    "use strict";
+
+    // ─────────────────────────────────────────────
+    //  REFERENCIAS AL DOM
+    // ─────────────────────────────────────────────
+    const lienzo          = document.getElementById("lienzo");
+    const ctx             = lienzo.getContext("2d");
+
+    const sliderVelocidad  = document.getElementById("sliderVelocidad");
+    const sliderDistanciaX = document.getElementById("sliderDistanciaX");
+    const sliderAlturaY    = document.getElementById("sliderAlturaY");
+
+    const valorVelocidad   = document.getElementById("valorVelocidad");
+    const valorDistanciaX  = document.getElementById("valorDistanciaX");
+    const valorAlturaY     = document.getElementById("valorAlturaY");
+
+    const botonPausar      = document.getElementById("botonPausar");
+    const botonReiniciar   = document.getElementById("botonReiniciar");
+    const mensajeImpacto   = document.getElementById("mensajeImpacto");
+
+    const datoAngulo       = document.getElementById("datoAngulo");
+    const datoTiempo       = document.getElementById("datoTiempo");
+    const datoDistancia    = document.getElementById("datoDistancia");
+
+    // ─────────────────────────────────────────────
+    //  CONSTANTES FÍSICAS Y DE ESCALA
+    // ─────────────────────────────────────────────
+    const GRAVEDAD          = 9.8;   // m/s² 
+    const PX_POR_METRO      = 20;    // escala visual: 20 píxeles = 1 metro
+    const RADIO_PROYECTIL   = 7;     // radio visual del proyectil (px)
+    const RADIO_MONO        = 24;    // radio visual del mono (px)
+    const UMBRAL_IMPACTO_PX = 28;    // distancia de colisión entre centros (px)
+    const Y_SUELO_CANVAS    = 460;   // fila del suelo en coordenadas de canvas (px)
+
+    // ─────────────────────────────────────────────
+    //  ESTADO DE LA SIMULACIÓN
+    // ─────────────────────────────────────────────
+    let estadoSim = {
+      corriendo:    false,   
+      pausada:      false,  
+      impacto:      false,  
+      idAnimacion:  null,    
+      tiempoInicio: null,    
+      tiempoActual: 0,       
+    };
+
+    // Posición del cañón (esquina inferior izquierda del canvas)
+  
+    let canonX = 0;
+    let canonY = 0;
+
+    // Parámetros del disparo (se calculan al iniciar)
+    let velocidadInicial  = 0;
+    let anguloDisparo     = 0;   // radianes
+    let velocidadInicialX = 0;
+    let velocidadInicialY = 0;
+
+    // Posición inicial del mono (en píxeles de canvas)
+    let monoInicialX = 0;
+    let monoInicialY = 0;
+
+    // Posiciones actuales (en píxeles de canvas)
+    let proyectilX = 0;
+    let proyectilY = 0;
+    let monoX      = 0;
+    let monoY      = 0;
+
+    // ─────────────────────────────────────────────
+    //  CONVERSIÓN DE COORDENADAS
+    // ─────────────────────────────────────────────
+
+    function fisicaYACanvasY(yFisico) {
+      return lienzo.height - yFisico;
+    }
+
+    function canvasYAFisicaY(yCanvas) {
+      return lienzo.height - yCanvas;
+    }
+
+    // ─────────────────────────────────────────────
+    //  LECTURA DE SLIDERS
+    // ─────────────────────────────────────────────
+
+    function leerParametros() {
+      velocidadInicial = parseFloat(sliderVelocidad.value);
+      monoInicialX     = parseFloat(sliderDistanciaX.value);
+
+      const alturaMonoPx = parseFloat(sliderAlturaY.value);
+      monoInicialY = fisicaYACanvasY(alturaMonoPx);
+
+      const xMetros = ((monoInicialX - 30) / PX_POR_METRO).toFixed(1);
+      const hMetros = (alturaMonoPx       / PX_POR_METRO).toFixed(1);
+
+      valorVelocidad.textContent  = velocidadInicial + " m/s";
+      valorDistanciaX.textContent = xMetros + " m";
+      valorAlturaY.textContent    = hMetros + " m";
+    }
+
+    // ─────────────────────────────────────────────
+    //  CÁLCULO DEL ÁNGULO DE DISPARO
+    //  θ = atan2(ΔY, ΔX) apuntando al mono
+    // ─────────────────────────────────────────────
+
+    function calcularAnguloDisparo() {
+      const deltaX_m = (monoInicialX          - canonX)             / PX_POR_METRO;
+      const deltaY_m = (canvasYAFisicaY(monoInicialY) - canvasYAFisicaY(canonY)) / PX_POR_METRO;
+
+      anguloDisparo = Math.atan2(deltaY_m, deltaX_m);
+
+      velocidadInicialX = velocidadInicial * Math.cos(anguloDisparo);
+      velocidadInicialY = velocidadInicial * Math.sin(anguloDisparo);
+    }
+
+    // ─────────────────────────────────────────────
+    //  REINICIAR / INICIALIZAR SIMULACIÓN
+    // ─────────────────────────────────────────────
+
+    function reiniciarSimulacion() {
+      if (estadoSim.idAnimacion) {
+        cancelAnimationFrame(estadoSim.idAnimacion);
+      }
+
+      
+      // canonY usa la misma constante Y_SUELO_CANVAS para que todo sea consistente
+      canonX = 30;
+      canonY = Y_SUELO_CANVAS; 
+
+      leerParametros();
+      calcularAnguloDisparo();
+
+      proyectilX = canonX;
+      proyectilY = canonY;
+      monoX      = monoInicialX;
+      monoY      = monoInicialY;
+
+      estadoSim = {
+        corriendo:    true,
+        pausada:      false,
+        impacto:      false,
+        idAnimacion:  null,
+        tiempoInicio: null,
+        tiempoActual: 0,
+      };
+
+      mensajeImpacto.style.display = "none";
+      botonPausar.textContent = "Pausar";
+
+      estadoSim.idAnimacion = requestAnimationFrame(bucleAnimacion);
+    }
+
+    // ─────────────────────────────────────────────
+    //  BUCLE PRINCIPAL DE ANIMACIÓN
+    // ─────────────────────────────────────────────
+
+    function bucleAnimacion(marcaTiempo) {
+      if (!estadoSim.corriendo) return;
+
+      if (estadoSim.tiempoInicio === null) {
+        estadoSim.tiempoInicio = marcaTiempo;
+      }
+
+      const t = (marcaTiempo - estadoSim.tiempoInicio) / 1000;
+      estadoSim.tiempoActual = t;
+
+
+      const canon_m_X = canonX                        / PX_POR_METRO;
+      const canon_m_Y = canvasYAFisicaY(canonY)       / PX_POR_METRO;
+      const mono0_m_Y = canvasYAFisicaY(monoInicialY) / PX_POR_METRO;
+
+      const proyectilMetrosX = canon_m_X + velocidadInicialX * t;
+      const proyectilMetrosY = canon_m_Y + velocidadInicialY * t - 0.5 * GRAVEDAD * t * t;
+      const monoMetrosY      = mono0_m_Y                         - 0.5 * GRAVEDAD * t * t;
+
+      proyectilX = proyectilMetrosX * PX_POR_METRO;
+      proyectilY = fisicaYACanvasY(proyectilMetrosY * PX_POR_METRO);
+      monoX      = monoInicialX;  
+      monoY      = fisicaYACanvasY(monoMetrosY * PX_POR_METRO);
+
+      estadoSim.proyectilMetrosX = proyectilMetrosX;
+      estadoSim.proyectilMetrosY = proyectilMetrosY;
+      estadoSim.monoMetrosY      = monoMetrosY;
+
+      // ── DETECCIÓN DE IMPACTO (Teorema de Pitágoras en píxeles) ──
+      const distanciaEntreObjetos = Math.sqrt(
+        Math.pow(proyectilX - monoX, 2) +
+        Math.pow(proyectilY - monoY, 2)
+      );
+
+      
+      const proyectilTocaSuelo = proyectilMetrosY <= 0;
+      const monoTocaSuelo      = monoMetrosY      <= 0;
+
+      dibujarEscena(t, distanciaEntreObjetos);
+      actualizarDatosPanel(t, distanciaEntreObjetos, anguloDisparo);
+
+      if (distanciaEntreObjetos <= UMBRAL_IMPACTO_PX) {
+        estadoSim.impacto   = true;
+        estadoSim.corriendo = false;
+        mensajeImpacto.style.display = "block";
+        return;
+      }
+
+      if (proyectilTocaSuelo || monoTocaSuelo) {
+        estadoSim.corriendo = false;
+        return;
+      }
+
+      estadoSim.idAnimacion = requestAnimationFrame(bucleAnimacion);
+    }
+
+    // ─────────────────────────────────────────────
+    //  DIBUJO DE LA ESCENA
+    // ─────────────────────────────────────────────
+
+    function dibujarEscena(tiempoActual, distancia) {
+      ctx.clearRect(0, 0, lienzo.width, lienzo.height);
+
+      dibujarFondo();
+      dibujarLineaMira();
+      dibujarCanon();
+      dibujarProyectil(tiempoActual);
+      dibujarMono(tiempoActual, distancia);
+    }
+
+    function dibujarFondo() {
+      ctx.strokeStyle = "rgba(255,255,255,0.04)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= lienzo.width; x += 50) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, lienzo.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= lienzo.height; y += 50) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(lienzo.width, y);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = "rgba(255,255,255,0.15)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, lienzo.height - 2);
+      ctx.lineTo(lienzo.width, lienzo.height - 2);
+      ctx.stroke();
+    }
+
+    function dibujarLineaMira() {
+      ctx.save();
+      ctx.setLineDash([6, 6]);
+      ctx.strokeStyle = "rgba(88, 166, 255, 0.35)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(canonX, canonY);
+      ctx.lineTo(monoInicialX, monoInicialY);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function dibujarCanon() {
+      ctx.save();
+      ctx.translate(canonX, canonY);
+     
+      ctx.rotate(-anguloDisparo);
+
+      ctx.fillStyle = "#58a6ff";
+      ctx.beginPath();
+      ctx.roundRect(0, -8, 38, 16, 4);
+      ctx.fill();
+
+      
+      ctx.fillStyle = "#a371f7";
+      ctx.beginPath();
+      ctx.arc(0, 0, 12, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function dibujarProyectil(tiempoActual) {
+      
+      const gradiente = ctx.createRadialGradient(
+        proyectilX, proyectilY, 0,
+        proyectilX, proyectilY, RADIO_PROYECTIL * 2
+      );
+      gradiente.addColorStop(0,   "rgba(255,200,50,0.8)");
+      gradiente.addColorStop(0.5, "rgba(255,140,0,0.4)");
+      gradiente.addColorStop(1,   "rgba(255,140,0,0)");
+      ctx.fillStyle = gradiente;
+      ctx.beginPath();
+      ctx.arc(proyectilX, proyectilY, RADIO_PROYECTIL * 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#ffd700";
+      ctx.strokeStyle = "#ff8c00";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(proyectilX, proyectilY, RADIO_PROYECTIL, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      const pX = estadoSim.proyectilMetrosX !== undefined ? estadoSim.proyectilMetrosX.toFixed(1) : (proyectilX / PX_POR_METRO).toFixed(1);
+      const pY = estadoSim.proyectilMetrosY !== undefined ? estadoSim.proyectilMetrosY.toFixed(1) : (canvasYAFisicaY(proyectilY) / PX_POR_METRO).toFixed(1);
+      const textoCoords = `(${pX}, ${pY}) m`;
+      dibujarEtiqueta(textoCoords, proyectilX + 12, proyectilY - 12, "#ffd700");
+    }
+
+    /** Dibuja el mono con su estado y coordenadas */
+    function dibujarMono(tiempoActual, distancia) {
+      const cercano = distancia < 80;
+
+      ctx.fillStyle = cercano ? "#f85149" : "#3fb950";
+      ctx.strokeStyle = cercano ? "#ff6b6b" : "#52d66a";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(monoX, monoY, RADIO_MONO, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "#0d1117";
+      ctx.font = "bold 20px Inter";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("🐒", monoX, monoY);
+
+      const mX = (monoX      / PX_POR_METRO).toFixed(1);
+      const mY = estadoSim.monoMetrosY !== undefined ? estadoSim.monoMetrosY.toFixed(1) : (canvasYAFisicaY(monoY) / PX_POR_METRO).toFixed(1);
+      const textoCoords = `(${mX}, ${mY}) m`;
+      dibujarEtiqueta(textoCoords, monoX + 28, monoY - 26, cercano ? "#f85149" : "#3fb950");
+    }
+
+    
+    function dibujarEtiqueta(texto, x, y, color) {
+      ctx.save();
+      ctx.font = "bold 11px 'JetBrains Mono', monospace";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+
+      const anchoTexto = ctx.measureText(texto).width;
+      const padding = 5;
+
+      
+      ctx.fillStyle = "rgba(13, 17, 23, 0.8)";
+      ctx.beginPath();
+      ctx.roundRect(x - padding, y - padding, anchoTexto + padding * 2, 18 + padding, 4);
+      ctx.fill();
+
+      ctx.fillStyle = color;
+      ctx.fillText(texto, x, y);
+      ctx.restore();
+    }
+
+    // ─────────────────────────────────────────────
+    //  ACTUALIZAR PANEL DE DATOS
+    // ─────────────────────────────────────────────
+
+    function actualizarDatosPanel(t, distancia, angulo) {
+      const anguloGrados = (angulo * 180 / Math.PI).toFixed(1);
+      datoAngulo.textContent    = anguloGrados + "°";
+      datoTiempo.textContent    = t.toFixed(2) + " s";
+      datoDistancia.textContent = distancia.toFixed(1) + " px";
+    }
+
+    // ─────────────────────────────────────────────
+    //  PAUSA / REANUDAR
+    // ─────────────────────────────────────────────
+
+    function togglePausa() {
+      if (!estadoSim.corriendo && !estadoSim.pausada) return; 
+
+      if (estadoSim.pausada) {
+      
+        estadoSim.pausada      = false;
+        estadoSim.corriendo    = true;
+        estadoSim.tiempoInicio = null; 
+
+      
+        const tiempoYaTranscurrido = estadoSim.tiempoActual * 1000;
+        estadoSim.idAnimacion = requestAnimationFrame((marcaTiempo) => {
+          estadoSim.tiempoInicio = marcaTiempo - tiempoYaTranscurrido;
+          bucleAnimacion(marcaTiempo);
+        });
+        botonPausar.textContent = "Pausar";
+      } else {
+        
+        estadoSim.pausada   = true;
+        estadoSim.corriendo = false;
+        cancelAnimationFrame(estadoSim.idAnimacion);
+        botonPausar.textContent = "Reanudar";
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    //  EVENTOS DE LOS SLIDERS
+    // ─────────────────────────────────────────────
+
+    sliderVelocidad.addEventListener("input",  reiniciarSimulacion);
+    sliderDistanciaX.addEventListener("input", reiniciarSimulacion);
+    sliderAlturaY.addEventListener("input",    reiniciarSimulacion);
+
+    // ─────────────────────────────────────────────
+    //  EVENTOS DE LOS BOTONES
+    // ─────────────────────────────────────────────
+
+    botonPausar.addEventListener("click",    togglePausa);
+    botonReiniciar.addEventListener("click", reiniciarSimulacion);
+
+    // ─────────────────────────────────────────────
+    //  ARRANQUE INICIAL
+    // ─────────────────────────────────────────────
+    reiniciarSimulacion();
+
+  </script>
+</body>
+</html>
