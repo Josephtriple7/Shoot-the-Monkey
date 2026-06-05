@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ilusión de Movimiento de Tusi - Simulación Geométrica</title>
+    <style>
+        /* --- ESTILOS GENERALES Y DARK MODE --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0b0f19;
+            color: #e2e8f0;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* --- PANEL DE CONTROL DE LA UI --- */
+        #ui-panel {
+            width: 320px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.8rem;
+            z-index: 10;
+            box-shadow: 5px 0 25px rgba(0, 0, 0, 0.5);
+            overflow-y: auto;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            background: linear-gradient(45deg, #38bdf8, #a855f7);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: -0.5rem;
+        }
+
+        p.subtitle {
+            font-size: 0.8rem;
+            color: #64748b;
+            line-height: 1.3;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #94a3b8;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .value-display {
+            color: #38bdf8;
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        /* Estilos de los Sliders (Range) */
+        input[type="range"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: #1e293b;
+            border-radius: 3px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+            box-shadow: 0 0 8px #38bdf8;
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* Estilos de los Switches (Toggles) */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 22px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #1e293b;
+            transition: .3s;
+            border-radius: 34px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #94a3b8;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: rgba(56, 189, 248, 0.2);
+            border-color: #38bdf8;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(18px);
+            background-color: #38bdf8;
+            box-shadow: 0 0 8px #38bdf8;
+        }
+
+        /* --- CONTENEDOR DEL CANVAS --- */
+        #canvas-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            background: radial-gradient(circle at center, #111827 0%, #070a10 100%);
+        }
+
+        canvas {
+            display: block;
+        }
+
+        footer {
+            margin-top: auto;
+            font-size: 0.75rem;
+            color: #475569;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <div>
+            <h1>Acople de Tusi</h1>
+            <p class="subtitle">Nasir al-Din al-Tusi (1247). Conversión de movimiento circular a rectilíneo.</p>
+        </div>
+
+        <hr style="border-color: rgba(255,255,255,0.05)">
+
+        <div class="control-group">
+            <label for="dot-count">Cantidad de Puntos <span id="dot-count-val" class="value-display">8</span></label>
+            <input type="range" id="dot-count" min="1" max="20" value="8">
+        </div>
+
+        <div class="control-group">
+            <label for="speed">Velocidad de Rotación <span id="speed-val" class="value-display">1.0</span></label>
+            <input type="range" id="speed" min="0" max="3" step="0.1" value="1.0">
+        </div>
+
+        <hr style="border-color: rgba(255,255,255,0.05)">
+
+        <div class="control-group" style="gap: 1rem;">
+            <label class="toggle-container">
+                <span>Círculo Mayor (R)</span>
+                <span class="switch">
+                    <input type="checkbox" id="show-outer" checked>
+                    <span class="slider"></span>
+                </span>
+            </label>
+
+            <label class="toggle-container">
+                <span>Círculo Menor (r = R/2)</span>
+                <span class="switch">
+                    <input type="checkbox" id="show-inner" checked>
+                    <span class="slider"></span>
+                </span>
+            </label>
+
+            <label class="toggle-container">
+                <span>Líneas de Diámetro</span>
+                <span class="switch">
+                    <input type="checkbox" id="show-lines" checked>
+                    <span class="slider"></span>
+                </span>
+            </label>
+        </div>
+
+        <footer>
+            Geometría Matemática • Canvas 2D API
+        </footer>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="tusiCanvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('tusiCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+
+        // selectores de la UI
+        const dotCountInput = document.getElementById('dot-count');
+        const dotCountVal = document.getElementById('dot-count-val');
+        const speedInput = document.getElementById('speed');
+        const speedVal = document.getElementById('speed-val');
+        const showOuterCheck = document.getElementById('show-outer');
+        const showInnerCheck = document.getElementById('show-inner');
+        const showLinesCheck = document.getElementById('show-lines');
+
+        // Parámetros de la simulación
+        let state = {
+            dots: parseInt(dotCountInput.value),
+            speedModifier: parseFloat(speedInput.value),
+            showOuter: showOuterCheck.checked,
+            showInner: showInnerCheck.checked,
+            showLines: showLinesCheck.checked,
+            angle: 0 // Ángulo global de rotación de la simulación
+        };
+
+        // Escuchadores de eventos de la UI para actualización en tiempo real
+        dotCountInput.addEventListener('input', (e) => {
+            state.dots = parseInt(e.target.value);
+            dotCountVal.textContent = state.dots;
+        });
+        speedInput.addEventListener('input', (e) => {
+            state.speedModifier = parseFloat(e.target.value);
+            speedVal.textContent = state.speedModifier.toFixed(1);
+        });
+        showOuterCheck.addEventListener('change', (e) => state.showOuter = e.target.checked);
+        showInnerCheck.addEventListener('change', (e) => state.showInner = e.target.checked);
+        showLinesCheck.addEventListener('change', (e) => state.showLines = e.target.checked);
+
+        // Ajuste adaptativo del tamaño del Canvas
+        function resizeCanvas() {
+            const size = Math.min(container.clientWidth, container.clientHeight) * 0.85;
+            canvas.width = size;
+            canvas.height = size;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Ciclo principal de animación
+        function animate() {
+            // Limpieza del canvas con un ligero rastro de opacidad para mejorar el efecto visual
+            ctx.fillStyle = '#070a10';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const R = canvas.width * 0.45; // Radio del círculo mayor
+            const r = R / 2;               // Radio del círculo menor (Razón geométrica 2:1)
+
+            // --- 1. DIBUJAR CÍRCULO MAYOR ESTATICO ---
+            if (state.showOuter) {
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, R, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(71, 85, 105, 0.4)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // --- 2. DIBUJAR CÍRCULO MENOR MÓVIL ---
+            // El centro del círculo pequeño orbita alrededor del centro del círculo grande a velocidad 'angle'
+            const innerCenterX = centerX + r * Math.cos(state.angle);
+            const innerCenterY = centerY + r * Math.sin(state.angle);
+
+            if (state.showInner) {
+                ctx.beginPath();
+                ctx.arc(innerCenterX, innerCenterY, r, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)'; // Tono púrpura sutil
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+
+            // --- 3. DIBUJAR DIÁMETROS Y PUNTOS OSCILANTES ---
+            for (let i = 0; i < state.dots; i++) {
+                // Ángulo de inclinación de este diámetro específico
+                const alpha = (i * Math.PI) / state.dots;
+
+                // Dibujar Línea del Diámetro
+                if (state.showLines) {
+                    ctx.beginPath();
+                    ctx.moveTo(centerX - R * Math.cos(alpha), centerY - R * Math.sin(alpha));
+                    ctx.lineTo(centerX + R * Math.cos(alpha), centerY + R * Math.sin(alpha));
+                    ctx.strokeStyle = 'rgba(51, 65, 85, 0.25)';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+
+                /**
+                 * MATEMÁTICAS DE TUSI:
+                 * Para cualquier punto en la circunferencia del círculo menor que rueda sin deslizar:
+                 * La posición en su diámetro correspondiente es una oscilación armónica simple.
+                 * El desfase angular relativo entre cada punto depende directamente de la orientación del diámetro (alpha).
+                 */
+                const distance = R * Math.cos(state.angle - alpha);
+                const dotX = centerX + distance * Math.cos(alpha);
+                const dotY = centerY + distance * Math.sin(alpha);
+
+                // Dibujo de la Esfera con Efecto Glow (Brillo) utilizando gradientes radiales
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(dotX, dotY, 7, 0, Math.PI * 2);
+
+                // Generamos una paleta de colores dinámica cian-azul-púrpura según el punto
+                const hue = (360 / state.dots) * i;
+                ctx.fillStyle = `hsla(${hue}, 90%, 65%, 1)`;
+                
+                // Configuración de sombra de Canvas para simular el Glow
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = `hsla(${hue}, 90%, 65%, 0.8)`;
+                
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Incremento del paso angular basado en el delta de velocidad
+            state.angle += 0.015 * state.speedModifier;
+
+            requestAnimationFrame(animate);
+        }
+
+        // Inicialización de la animación
+        animate();
+    </script>
+</body>
+</html>

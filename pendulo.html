@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ondas de Péndulo - Simulación Física</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #050508;
+            --panel-bg: rgba(15, 23, 42, 0.7);
+            --accent-cyan: #22d3ee;
+            --accent-indigo: #6366f1;
+            --text-main: #f1f5f9;
+            --text-dim: #94a3b8;
+            --sidebar-width: 320px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* --- PANEL LATERAL (CONTROLES) --- */
+        aside {
+            width: var(--sidebar-width);
+            background: var(--panel-bg);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 40px 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            z-index: 100;
+        }
+
+        .brand h1 {
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            background: linear-gradient(to right, var(--accent-cyan), var(--accent-indigo));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 5px;
+        }
+
+        .brand p {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .control-header label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-dim);
+        }
+
+        .value-badge {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-cyan);
+            font-size: 0.9rem;
+        }
+
+        /* Sliders */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 4px;
+            background: #1e293b;
+            border-radius: 2px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px; height: 18px;
+            background: var(--accent-cyan);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+        }
+
+        /* Toggles (Switches) */
+        .switch-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+
+        .switch input { opacity: 0; width: 0; height: 0; }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #1e293b;
+            transition: .4s;
+            border-radius: 20px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px; width: 14px;
+            left: 3px; bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider { background-color: var(--accent-indigo); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        .btn-main {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid var(--accent-indigo);
+            color: var(--text-main);
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            transition: 0.3s;
+            margin-top: 10px;
+        }
+
+        .btn-main:hover {
+            background: var(--accent-indigo);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+        }
+
+        /* --- ÁREA DEL CANVAS --- */
+        main {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, #0f172a 0%, #050508 100%);
+        }
+
+        canvas {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        footer {
+            margin-top: auto;
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            text-align: center;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <aside>
+        <div class="brand">
+            <h1>Ondas de Péndulo</h1>
+            <p>Física Armónica v2.0</p>
+        </div>
+
+        <div class="control-group">
+            <div class="control-header">
+                <label>Cantidad de Puntos</label>
+                <span id="valCount" class="value-badge">15</span>
+            </div>
+            <input type="range" id="inputCount" min="5" max="30" value="15">
+        </div>
+
+        <div class="control-group">
+            <div class="control-header">
+                <label>Velocidad Simulación</label>
+                <span id="valSpeed" class="value-badge">1.0x</span>
+            </div>
+            <input type="range" id="inputSpeed" min="0.1" max="3" step="0.1" value="1">
+        </div>
+
+        <div class="control-group">
+            <div class="switch-container">
+                <label>Visualizar Hilos</label>
+                <label class="switch">
+                    <input type="checkbox" id="checkStrings" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="switch-container">
+                <label>Pausar Movimiento</label>
+                <label class="switch">
+                    <input type="checkbox" id="checkPause">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <button class="btn-main" id="btnReset">Reiniciar Ciclo</button>
+
+        <footer>
+            Basado en el experimento de Ciencia Mania<br>
+            Cálculo de Longitud: L = g / (2πf)²
+        </footer>
+    </aside>
+
+    <main>
+        <canvas id="canvas"></canvas>
+    </main>
+
+    <script>
+        /**
+         * LÓGICA DE DESARROLLO Y FÍSICA
+         * Como físico y dev, implementamos el Movimiento Armónico Simple (MAS).
+         * La clave es que el péndulo N hace 'k' oscilaciones en un tiempo T,
+         * y el péndulo N+1 hace 'k+1'. Esto genera los patrones de ondas.
+         */
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Elementos de UI
+        const inputCount = document.getElementById('inputCount');
+        const valCount = document.getElementById('valCount');
+        const inputSpeed = document.getElementById('inputSpeed');
+        const valSpeed = document.getElementById('valSpeed');
+        const checkStrings = document.getElementById('checkStrings');
+        const checkPause = document.getElementById('checkPause');
+        const btnReset = document.getElementById('btnReset');
+
+        // Configuración Física
+        const G = 9.81 * 10000; // Gravedad escalada para visualización
+        const MIN_FREQ = 51 / 60; // 51 oscilaciones por minuto -> Hz
+        const MAX_FREQ = 65 / 60; // 65 oscilaciones por minuto -> Hz
+        const MAX_AMPLITUDE = 0.2; // Amplitud en radianes (~12 grados para MAS puro)
+
+        let pendulums = [];
+        let time = 0;
+        let lastTime = performance.now();
+
+        class Pendulum {
+            constructor(index, freq, color, total) {
+                this.index = index;
+                this.freq = freq; // f en Hz
+                this.color = color;
+                // Cálculo de longitud basado en f = (1 / 2π) * sqrt(g / L)
+                this.length = G / (Math.pow(2 * Math.PI * this.freq, 2));
+                this.omega = 2 * Math.PI * this.freq;
+            }
+
+            update(t) {
+                // Ecuación de posición angular: θ(t) = A * cos(ω * t)
+                this.angle = MAX_AMPLITUDE * Math.cos(this.omega * t);
+            }
+
+            draw(originX, startY, spacingY) {
+                const y = startY + (this.index * spacingY);
+                // Proyección horizontal del movimiento
+                const x = originX + Math.sin(this.angle) * this.length * 0.15;
+
+                // Dibujar Hilo si está activo
+                if (checkStrings.checked) {
+                    ctx.beginPath();
+                    ctx.moveTo(originX, y);
+                    ctx.lineTo(x, y);
+                    ctx.strokeStyle = 'rgba(148, 163, 184, 0.15)';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+
+                // Dibujar Esfera con Glow
+                ctx.beginPath();
+                ctx.arc(x, y, 10, 0, Math.PI * 2);
+                
+                // Efecto de luz dinámica
+                const grad = ctx.createRadialGradient(x - 3, y - 3, 2, x, y, 10);
+                grad.addColorStop(0, '#fff');
+                grad.addColorStop(0.4, this.color);
+                grad.addColorStop(1, '#000');
+
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.color;
+                ctx.fillStyle = grad;
+                ctx.fill();
+                ctx.shadowBlur = 0; // Reset para rendimiento
+            }
+        }
+
+        function initSimulation() {
+            const count = parseInt(inputCount.value);
+            valCount.innerText = count;
+            pendulums = [];
+
+            for (let i = 0; i < count; i++) {
+                // Interpolación lineal de frecuencias entre 51 y 65 osc/min
+                // Esto asegura que el patrón se mantenga sin importar el N
+                const f = MIN_FREQ + (i * (MAX_FREQ - MIN_FREQ) / (count - 1));
+                
+                // Generación de color en escala HSL
+                const hue = (i * (260 / count)); 
+                const color = `hsl(${hue}, 80%, 60%)`;
+                
+                pendulums.push(new Pendulum(i, f, color, count));
+            }
+        }
+
+        function resize() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+
+        function loop(now) {
+            const dt = (now - lastTime) / 1000;
+            lastTime = now;
+
+            // Limpieza con trail
+            ctx.fillStyle = 'rgba(5, 5, 8, 0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (!checkPause.checked) {
+                time += dt * parseFloat(inputSpeed.value);
+            }
+
+            const originX = canvas.width / 2;
+            const padding = 60;
+            const spacingY = (canvas.height - (padding * 2)) / (pendulums.length - 1);
+
+            pendulums.forEach(p => {
+                p.update(time);
+                p.draw(originX, padding, spacingY);
+            });
+
+            requestAnimationFrame(loop);
+        }
+
+        // Listeners
+        inputCount.addEventListener('input', initSimulation);
+        inputSpeed.addEventListener('input', () => valSpeed.innerText = inputSpeed.value + 'x');
+        btnReset.addEventListener('click', () => time = 0);
+        window.addEventListener('resize', resize);
+
+        // Arranque
+        resize();
+        initSimulation();
+        requestAnimationFrame(loop);
+
+    </script>
+</body>
+</html>
