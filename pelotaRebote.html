@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Rebotes y Vectores</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f0f4f8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 28px;
+        }
+
+        #simulation-container {
+            position: relative;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Lienzo de la simulación */
+        canvas {
+            background: #ffffff;
+            display: block;
+            cursor: crosshair;
+        }
+
+        /* Panel de control superior e inferior */
+        .controls {
+            background: #ecf0f1;
+            padding: 15px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #bdc3c7;
+        }
+
+        .data-panel {
+            background: #34495e;
+            color: #ecf0f1;
+            padding: 10px;
+            display: flex;
+            justify-content: space-around;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        /* Botones y controles de formulario */
+        button {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-gravity {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        .btn-gravity.active {
+            background-color: #2ecc71;
+        }
+
+        .btn-reset {
+            background-color: #3498db;
+            color: white;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        label {
+            font-size: 14px;
+            color: #34495e;
+            font-weight: 600;
+        }
+
+        input[type="range"] {
+            width: 120px;
+        }
+
+        /* Instrucciones flotantes */
+        .instructions {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #7f8c8d;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Simulador de Rebotes (Física)</h1>
+
+    <div id="simulation-container">
+        <div class="controls">
+            <button id="gravityToggle" class="btn-gravity">Gravedad: OFF</button>
+            
+            <label for="elasticity">Elasticidad (Rebote):</label>
+            <input type="range" id="elasticity" min="0.5" max="1" step="0.05" value="0.9">
+            
+            <button id="resetBtn" class="btn-reset">Reiniciar Pelota</button>
+        </div>
+
+        <canvas id="simCanvas" width="800" height="450"></canvas>
+
+        <div class="data-panel">
+            <span id="data-vx">Vx: 0.00 m/s</span>
+            <span id="data-vy">Vy: 0.00 m/s</span>
+            <span id="data-v">V Total: 0.00 m/s</span>
+            <span id="data-fps">Estado: Estable</span>
+        </div>
+    </div>
+
+    <p class="instructions">
+        💡 <b>Interacción:</b> Mantén presionado el clic del ratón sobre los obstáculos grisáceos para moverlos por el mapa.
+    </p>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Elementos DOM
+        const gravityToggle = document.getElementById('gravityToggle');
+        const elasticityInput = document.getElementById('elasticity');
+        const resetBtn = document.getElementById('resetBtn');
+        const dataVx = document.getElementById('data-vx');
+        const dataVy = document.getElementById('data-vy');
+        const dataV = document.getElementById('data-v');
+
+        // Configuración Física Global
+        let useGravity = false;
+        const GRAVITY_VALUE = 0.35; // Escala adaptada para pixeles/cuadro del canvas (~9.8 m/s ficticios)
+        let elasticity = parseFloat(elasticityInput.value);
+
+        // Propiedades de la Pelota Principal
+        const ball = {
+            x: 100,
+            y: 150,
+            radius: 16,
+            vx: 5,
+            vy: -3,
+            color: '#2c3e50',
+            // Historial de posiciones pasadas para dejar un rastro punteado
+            trail: []
+        };
+
+        // Arreglo de Objetos/Obstáculos interactivos y arrastrables con el ratón
+        const draggableObjects = [
+            { id: 1, x: 250, y: 380, width: 90, height: 20, color: '#7f8c8d', isDragging: false },
+            { id: 2, x: 550, y: 120, width: 25, height: 80, color: '#7f8c8d', isDragging: false },
+            { id: 3, x: 400, y: 250, width: 40, height: 40, color: '#95a5a6', isDragging: false }
+        ];
+
+        let activeDragObject = null;
+
+        // --- Gestión de Eventos del Ratón (Drag & Drop de Objetos) ---
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // Comprobar si se hizo clic dentro de algún objeto movible
+            for (let obj of draggableObjects) {
+                if (mouseX >= obj.x && mouseX <= obj.x + obj.width &&
+                    mouseY >= obj.y && mouseY <= obj.y + obj.height) {
+                    obj.isDragging = true;
+                    activeDragObject = obj;
+                    break;
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!activeDragObject) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // Posicionar el centro o esquina del objeto según el movimiento del mouse
+            activeDragObject.x = mouseX - activeDragObject.width / 2;
+            activeDragObject.y = mouseY - activeDragObject.height / 2;
+
+            // Límites para evitar que saquen los objetos del mapa visible
+            if (activeDragObject.x < 0) activeDragObject.x = 0;
+            if (activeDragObject.y < 0) activeDragObject.y = 0;
+            if (activeDragObject.x + activeDragObject.width > canvas.width) activeDragObject.x = canvas.width - activeDragObject.width;
+            if (activeDragObject.y + activeDragObject.height > canvas.height) activeDragObject.y = canvas.height - activeDragObject.height;
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            if (activeDragObject) {
+                activeDragObject.isDragging = false;
+                activeDragObject = null;
+            }
+        });
+
+        // Interacciones de la interfaz de usuario
+        gravityToggle.addEventListener('click', () => {
+            useGravity = !useGravity;
+            if (useGravity) {
+                gravityToggle.textContent = "Gravedad: ON (9.8m/s²)";
+                gravityToggle.classList.add('active');
+            } else {
+                gravityToggle.textContent = "Gravedad: OFF (v cte)";
+                gravityToggle.classList.remove('active');
+            }
+        });
+
+        elasticityInput.addEventListener('input', (e) => {
+            elasticity = parseFloat(e.target.value);
+        });
+
+        resetBtn.addEventListener('click', () => {
+            ball.x = 80;
+            ball.y = 120;
+            ball.vx = 4 + Math.random() * 4;
+            ball.vy = -2 - Math.random() * 3;
+            ball.trail = [];
+        });
+
+
+        // --- Funciones de Dibujo Auxiliares ---
+
+        // Dibuja una flecha estilizada (para representar los vectores vectoriales)
+        function drawArrow(startX, startY, endX, endY, color, width = 2.5) {
+            const headLength = 9; // Tamaño de la punta de la flecha
+            const dx = endX - startX;
+            const dy = endY - startY;
+            const angle = Math.atan2(dy, dx);
+
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = width;
+
+            // Línea principal
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+
+            // Punta de la flecha
+            ctx.beginPath();
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(endX - headLength * Math.cos(angle - Math.PI / 6), endY - headLength * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(endX - headLength * Math.cos(angle + Math.PI / 6), endY - headLength * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // --- Bucle Principal de Física y Renderizado ---
+        function updateSimulation() {
+            // 1. Lógica física del movimiento de la pelota
+            if (useGravity) {
+                ball.vy += GRAVITY_VALUE; // Aplicar aceleración gravitacional continua descendente
+            }
+
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // Guardar el rastro de la trayectoria de la pelota de manera espaciada
+            if (Math.random() > 0.4) {
+                ball.trail.push({ x: ball.x, y: ball.y });
+                if (ball.trail.length > 45) ball.trail.shift(); // Límite del tamaño de la cola
+            }
+
+            // 2. Colisiones contra las paredes del Canvas
+            // Pared derecha
+            if (ball.x + ball.radius > canvas.width) {
+                ball.x = canvas.width - ball.radius;
+                ball.vx = -ball.vx * elasticity;
+            }
+            // Pared izquierda
+            if (ball.x - ball.radius < 0) {
+                ball.x = ball.radius;
+                ball.vx = -ball.vx * elasticity;
+            }
+            // Suelo inferior
+            if (ball.y + ball.radius > canvas.height) {
+                ball.y = canvas.height - ball.radius;
+                ball.vy = -ball.vy * elasticity;
+                
+                // Pequeña fricción en el suelo si hay gravedad para estabilizar la rodada
+                if (useGravity && Math.abs(ball.vy) < 0.5) ball.vy = 0;
+            }
+            // Techo superior
+            if (ball.y - ball.radius < 0) {
+                ball.y = ball.radius;
+                ball.vy = -ball.vy * elasticity;
+            }
+
+            // 3. Colisiones de la pelota contra los objetos arrastrables (Cajas AABB simplificado)
+            for (let obj of draggableObjects) {
+                // Encontrar el punto más cercano en el rectángulo a la circunferencia de la pelota
+                let closestX = Math.max(obj.x, Math.min(ball.x, obj.x + obj.width));
+                let closestY = Math.max(obj.y, Math.min(ball.y, obj.y + obj.height));
+
+                // Calcular la distancia entre el punto más cercano y el centro de la pelota
+                let distanceX = ball.x - closestX;
+                let distanceY = ball.y - closestY;
+                let distanceSquared = (distanceX * distanceX) + (distanceY * distanceY);
+
+                if (distanceSquared < (ball.radius * ball.radius)) {
+                    // Hay colisión: Determinar qué lado golpeó basándose en las diferencias de distancia
+                    let overlapX = ball.radius - Math.abs(distanceX);
+                    let overlapY = ball.radius - Math.abs(distanceY);
+
+                    if (overlapX < overlapY) {
+                        // Colisión por la izquierda o derecha lateral
+                        ball.x += distanceX > 0 ? overlapX : -overlapX;
+                        ball.vx = -ball.vx * elasticity;
+                    } else {
+                        // Colisión por arriba o abajo
+                        ball.y += distanceY > 0 ? overlapY : -overlapY;
+                        ball.vy = -ball.vy * elasticity;
+                    }
+                }
+            }
+
+            // --- FASE DE RENDERIZADO / DIBUJO ---
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Fondo con rejilla cuadriculada suave tipo laboratorio de física
+            ctx.strokeStyle = '#f1f2f6';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 40) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 40) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+
+            // Dibujar el rastro punteado de la pelota
+            ctx.fillStyle = 'rgba(127, 140, 141, 0.4)';
+            for (let p of ball.trail) {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Dibujar los objetos arrastrables
+            for (let obj of draggableObjects) {
+                ctx.fillStyle = obj.color;
+                ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+                // Resaltado de borde si se está interactuando
+                ctx.strokeStyle = '#34495e';
+                ctx.lineWidth = obj.isDragging ? 2 : 1;
+                ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
+            }
+
+            // Dibujar la pelota principal
+            ctx.fillStyle = ball.color;
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // --- DIBUJO DE VECTORES DINÁMICOS (IGUAL QUE EN TU FOTO) ---
+            const vectorScale = 7; // Escala visual para exagerar la flecha de velocidad en pantalla
+            ctx.font = 'bold 13px sans-serif';
+
+            // 1. Vector componente X (Horizontal) - Color Rojo
+            const endVx_X = ball.x + (ball.vx * vectorScale);
+            drawArrow(ball.x, ball.y, endVx_X, ball.y, '#e74c3c', 2);
+            ctx.fillStyle = '#e74c3c';
+            ctx.fillText('Vx', endVx_X + (ball.vx >= 0 ? 5 : -18), ball.y - 6);
+
+            // 2. Vector componente Y (Vertical) - Color Naranja/Rojo oscuro
+            const endVy_Y = ball.y + (ball.vy * vectorScale);
+            drawArrow(ball.x, ball.y, ball.x, endVy_Y, '#d35400', 2);
+            ctx.fillStyle = '#d35400';
+            ctx.fillText('Vy', ball.x - 22, endVy_Y + (ball.vy >= 0 ? 12 : -5));
+
+            // 3. Vector Resultante de Velocidad Total (V) - Gris Oscuro/Negro
+            const endV_X = ball.x + (ball.vx * vectorScale);
+            const endV_Y = ball.y + (ball.vy * vectorScale);
+            drawArrow(ball.x, ball.y, endV_X, endV_Y, '#2c3e50', 3);
+            ctx.fillStyle = '#2c3e50';
+            ctx.fillText('V', endV_X + 8, endV_Y + 4);
+
+
+            // Actualizar textos informativos inferiores (Telemetría)
+            const vTotal = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+            dataVx.textContent = `Vx: ${ball.vx.toFixed(2)} m/s`;
+            dataVy.textContent = `Vy: ${(-ball.vy).toFixed(2)} m/s`; // Se invierte signo para simular plano cartesiano convencional
+            dataV.textContent = `V Total: ${vTotal.toFixed(2)} m/s`;
+
+            // Solicitar siguiente cuadro de animación recursivo
+            requestAnimationFrame(updateSimulation);
+        }
+
+        // Inicializar bucle de animación
+        updateSimulation();
+    </script>
+</body>
+</html>

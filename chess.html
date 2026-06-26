@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Futuristic Chess - Edición Jaque Mate</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #0a0116;
+            color: #fff;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-shadow: 0 0 15px #8a2be2, 0 0 30px #00ffff;
+            background: linear-gradient(45deg, #00ffff, #8a2be2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        #turn-indicator {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            padding: 5px 15px;
+            border-radius: 4px;
+        }
+
+        .turn-blancas {
+            color: #00ffff;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.6);
+        }
+
+        .turn-negras {
+            color: #ff007f;
+            text-shadow: 0 0 10px rgba(255, 0, 127, 0.6);
+        }
+
+        .turn-jaque {
+            color: #ff3333;
+            background-color: rgba(255, 0, 0, 0.2);
+            border: 1px solid #ff3333;
+            text-shadow: 0 0 10px #ff0000;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.8; }
+            50% { opacity: 1; box-shadow: 0 0 15px rgba(255,0,0,0.4); }
+            100% { opacity: 0.8; }
+        }
+
+        .chess-container {
+            position: relative;
+            padding: 12px;
+            background: linear-gradient(145deg, #15022e, #070014);
+            border-radius: 16px;
+            box-shadow: 0 0 40px rgba(138, 43, 226, 0.3), 
+                        inset 0 0 20px rgba(0, 0, 0, 0.6);
+            border: 2px solid rgba(138, 43, 226, 0.4);
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(8, 70px);
+            grid-template-rows: repeat(8, 70px);
+            border: 4px solid #0a0116;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 42px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+            position: relative;
+        }
+
+        .cell.light {
+            background-color: #1e1233;
+        }
+
+        .cell.dark {
+            background-color: #110722;
+        }
+
+        .piece.white {
+            color: #00ffff;
+            text-shadow: 0 0 8px rgba(0, 255, 255, 0.8), 0 0 15px rgba(0, 255, 255, 0.4);
+        }
+
+        .piece.black {
+            color: #ff007f;
+            text-shadow: 0 0 8px rgba(255, 0, 127, 0.8), 0 0 15px rgba(255, 0, 127, 0.4);
+        }
+
+        .cell:hover {
+            background-color: rgba(138, 43, 226, 0.25) !important;
+        }
+
+        .cell.selected {
+            background-color: rgba(138, 43, 226, 0.5) !important;
+            box-shadow: inset 0 0 15px #8a2be2;
+        }
+
+        .cell.valid-move::after {
+            content: '';
+            width: 16px;
+            height: 16px;
+            background-color: rgba(0, 255, 128, 0.7);
+            border-radius: 50%;
+            position: absolute;
+            box-shadow: 0 0 10px #00ff80;
+            pointer-events: none;
+        }
+
+        .cell.valid-move.has-piece::after {
+            width: 58px;
+            height: 58px;
+            background-color: transparent;
+            border: 3px dashed #00ff80;
+            border-radius: 8px;
+            box-shadow: 0 0 8px #00ff80;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Ajedrez Cyber</h1>
+    <div id="turn-indicator" class="turn-blancas">Turno: Cyan (Blancas)</div>
+
+    <div class="chess-container">
+        <div class="board" id="chessboard"></div>
+    </div>
+
+    <script>
+        const boardElement = document.getElementById('chessboard');
+        const turnIndicator = document.getElementById('turn-indicator');
+
+        const piecesSymbols = {
+            'r': '♖', 'n': '♘', 'b': '♗', 'q': '♕', 'k': '♔', 'p': '♙',
+            'R': '♜', 'N': '♞', 'B': '♝', 'Q': '♛', 'K': '♚', 'P': '♟'
+        };
+
+        let boardState = [
+            ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'],
+            ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+            ['',  '',  '',  '',  '',  '',  '',  ''],
+            ['',  '',  '',  '',  '',  '',  '',  ''],
+            ['',  '',  '',  '',  '',  '',  '',  ''],
+            ['',  '',  '',  '',  '',  '',  '',  ''],
+            ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
+            ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r']
+        ];
+
+        let hasMoved = {
+            whiteKing: false, whiteRookLeft: false, whiteRookRight: false,
+            blackKing: false, blackRookLeft: false, blackRookRight: false
+        };
+
+        let turn = 'white'; 
+        let selectedCell = null;
+        let validMoves = [];
+        let gameActive = true;
+
+        function createBoard() {
+            boardElement.innerHTML = '';
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.classList.add((row + col) % 2 === 0 ? 'light' : 'dark');
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+
+                    const piece = boardState[row][col];
+                    if (piece !== '') {
+                        const pieceElement = document.createElement('span');
+                        pieceElement.classList.add('piece');
+                        pieceElement.classList.add(piece === piece.toUpperCase() ? 'black' : 'white');
+                        pieceElement.textContent = piecesSymbols[piece];
+                        cell.appendChild(pieceElement);
+                    }
+
+                    cell.addEventListener('click', onCellClick);
+                    boardElement.appendChild(cell);
+                }
+            }
+        }
+
+        function onCellClick(e) {
+            if (!gameActive) return;
+
+            const cell = e.currentTarget;
+            const row = parseInt(cell.dataset.row);
+            const col = parseInt(cell.dataset.col);
+            const piece = boardState[row][col];
+
+            if (cell.classList.contains('valid-move')) {
+                movePiece(selectedCell.row, selectedCell.col, row, col);
+                clearHighlights();
+                selectedCell = null;
+                return;
+            }
+
+            clearHighlights();
+
+            if (piece !== '') {
+                const isBlack = piece === piece.toUpperCase();
+                if ((turn === 'white' && !isBlack) || (turn === 'black' && isBlack)) {
+                    selectedCell = { row, col };
+                    cell.classList.add('selected');
+                    
+                    // Obtener movimientos legales filtrados (que salven del jaque)
+                    validMoves = getLegalMoves(row, col, piece);
+                    highlightMoves();
+                }
+            } else {
+                selectedCell = null;
+            }
+        }
+
+        function clearHighlights() {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(c => {
+                c.classList.remove('selected', 'valid-move', 'has-piece');
+            });
+            validMoves = [];
+        }
+
+        // --- MOTOR DE MOVIMIENTOS BASE ---
+        function calculatePseudoMoves(row, col, piece, state = boardState) {
+            let pseudoMoves = [];
+            const type = piece.toLowerCase();
+            const isBlack = piece === piece.toUpperCase();
+
+            if (type === 'p') {
+                const direction = isBlack ? 1 : -1;
+                const startRow = isBlack ? 1 : 6;
+                let nextRow = row + direction;
+
+                if (nextRow >= 0 && nextRow < 8 && state[nextRow][col] === '') {
+                    pseudoMoves.push({ row: nextRow, col: col });
+                    let doubleRow = row + (direction * 2);
+                    if (row === startRow && state[doubleRow][col] === '') {
+                        pseudoMoves.push({ row: doubleRow, col: col });
+                    }
+                }
+
+                const captureCols = [col - 1, col + 1];
+                captureCols.forEach(cCol => {
+                    if (cCol >= 0 && cCol < 8 && nextRow >= 0 && nextRow < 8) {
+                        const targetPiece = state[nextRow][cCol];
+                        if (targetPiece !== '' && (targetPiece === targetPiece.toUpperCase()) !== isBlack) {
+                            pseudoMoves.push({ row: nextRow, col: cCol });
+                        }
+                    }
+                });
+            }
+            else if (type === 'k') {
+                const kingDirections = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]];
+                kingDirections.forEach(dir => {
+                    let nRow = row + dir[0], nCol = col + dir[1];
+                    if (nRow >= 0 && nRow < 8 && nCol >= 0 && nCol < 8) {
+                        const targetPiece = state[nRow][nCol];
+                        if (targetPiece === '' || (targetPiece === targetPiece.toUpperCase()) !== isBlack) {
+                            pseudoMoves.push({ row: nRow, col: nCol });
+                        }
+                    }
+                });
+
+                // Enroques (Solo si se analiza el tablero real actual)
+                if (state === boardState) {
+                    if (!isBlack && !hasMoved.whiteKing && row === 7 && col === 4) {
+                        if (!hasMoved.whiteRookRight && state[7][5] === '' && state[7][6] === '' && state[7][7] === 'r') 
+                            pseudoMoves.push({ row: 7, col: 6, isCastling: true, rookFromCol: 7, rookToCol: 5 });
+                        if (!hasMoved.whiteRookLeft && state[7][3] === '' && state[7][2] === '' && state[7][1] === '' && state[7][0] === 'r') 
+                            pseudoMoves.push({ row: 7, col: 2, isCastling: true, rookFromCol: 0, rookToCol: 3 });
+                    } else if (isBlack && !hasMoved.blackKing && row === 0 && col === 4) {
+                        if (!hasMoved.blackRookRight && state[0][5] === '' && state[0][6] === '' && state[0][7] === 'R') 
+                            pseudoMoves.push({ row: 0, col: 6, isCastling: true, rookFromCol: 7, rookToCol: 5 });
+                        if (!hasMoved.blackRookLeft && state[0][3] === '' && state[0][2] === '' && state[0][1] === '' && state[0][0] === 'R') 
+                            pseudoMoves.push({ row: 0, col: 2, isCastling: true, rookFromCol: 0, rookToCol: 3 });
+                    }
+                }
+            }
+            else {
+                const directions = [
+                    [-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1],
+                    [-2, -1], [-2, 1], [-1, -2], [-1, 2], [1, -2], [1, 2], [2, -1], [2, 1]
+                ];
+                let range = 8;
+                let activeDirs = [];
+                if (type === 'r') activeDirs = directions.slice(0, 4);
+                if (type === 'b') activeDirs = directions.slice(4, 8);
+                if (type === 'q') activeDirs = directions.slice(0, 8);
+                if (type === 'n') { activeDirs = directions.slice(8); range = 1; }
+
+                for (let dir of activeDirs) {
+                    for (let i = 1; i <= range; i++) {
+                        let nRow = row + dir[0] * i, nCol = col + dir[1] * i;
+                        if (nRow >= 0 && nRow < 8 && nCol >= 0 && nCol < 8) {
+                            const targetPiece = state[nRow][nCol];
+                            if (targetPiece === '') {
+                                pseudoMoves.push({ row: nRow, col: nCol });
+                            } else {
+                                if ((targetPiece === targetPiece.toUpperCase()) !== isBlack) pseudoMoves.push({ row: nRow, col: nCol });
+                                break;
+                            }
+                        } else break;
+                    }
+                }
+            }
+            return pseudoMoves;
+        }
+
+        // --- VERIFICAR SI EL REY ESTÁ BAJO ATAQUE ---
+        function isKingInCheck(color, state = boardState) {
+            let kingRow = -1, kingCol = -1;
+            const targetKing = color === 'white' ? 'k' : 'K';
+
+            // Buscar coordenadas del rey
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    if (state[r][c] === targetKing) { kingRow = r; kingCol = c; break; }
+                }
+            }
+
+            // Si el rey fue capturado en una simulación previa
+            if (kingRow === -1) return true;
+
+            // Recorrer todas las piezas enemigas y ver si alguna puede alcanzar al rey
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const p = state[r][c];
+                    if (p !== '') {
+                        const isEnemyBlack = p === p.toUpperCase();
+                        if ((color === 'white' && isEnemyBlack) || (color === 'black' && !isEnemyBlack)) {
+                            const enemyMoves = calculatePseudoMoves(r, c, p, state);
+                            if (enemyMoves.some(m => m.row === kingRow && m.col === kingCol)) return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        // --- FILTRAR MOVIMIENTOS LEGALES (Evitan que mates a tu propio Rey) ---
+        function getLegalMoves(row, col, piece) {
+            let pseudo = calculatePseudoMoves(row, col, piece, boardState);
+            let legal = [];
+            const color = (piece === piece.toUpperCase()) ? 'black' : 'white';
+
+            pseudo.forEach(move => {
+                // Generar un clon virtual del tablero para probar el movimiento
+                let tempBoard = boardState.map(r => [...r]);
+                
+                if (move.isCastling) {
+                    tempBoard[move.row][move.col] = piece;
+                    tempBoard[row][col] = '';
+                    tempBoard[move.row][move.rookToCol] = tempBoard[move.row][move.rookFromCol];
+                    tempBoard[move.row][move.rookFromCol] = '';
+                } else {
+                    tempBoard[move.row][move.col] = piece;
+                    tempBoard[row][col] = '';
+                }
+
+                // El movimiento es válido SI Y SOLO SI después de hacerlo tu rey no queda en jaque
+                if (!isKingInCheck(color, tempBoard)) {
+                    legal.push(move);
+                }
+            });
+            return legal;
+        }
+
+        // --- COMPROBAR JAQUE MATE ---
+        function checkGameOver() {
+            const nextColor = turn; 
+            let totalLegalMoves = 0;
+
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const p = boardState[r][c];
+                    if (p !== '') {
+                        const isPieceBlack = p === p.toUpperCase();
+                        if ((nextColor === 'black' && isPieceBlack) || (nextColor === 'white' && !isPieceBlack)) {
+                            const moves = getLegalMoves(r, c, p);
+                            totalLegalMoves += moves.length;
+                        }
+                    }
+                }
+            }
+
+            const inCheck = isKingInCheck(nextColor);
+
+            if (totalLegalMoves === 0) {
+                gameActive = false;
+                if (inCheck) {
+                    const winner = nextColor === 'white' ? 'NEÓN (Negras)' : 'CYAN (Blancas)';
+                    turnIndicator.textContent = `¡JAQUE MATE! GANAN LAS ${winner}`;
+                    turnIndicator.className = "turn-jaque";
+                    alert(`¡Fin del juego! Jaque Mate. Ganador: ${winner}`);
+                } else {
+                    turnIndicator.textContent = "¡EMPATE POR AHOGADO!";
+                    turnIndicator.style.color = "#ffff00";
+                }
+            } else if (inCheck) {
+                turnIndicator.textContent = `¡JAQUE AL REY ${nextColor === 'white' ? 'CYAN' : 'NEÓN'}!`;
+                turnIndicator.className = "turn-jaque";
+            } else {
+                if (turn === 'white') {
+                    turnIndicator.textContent = "Turno: Cyan (Blancas)";
+                    turnIndicator.className = "turn-blancas";
+                } else {
+                    turnIndicator.textContent = "Turno: Neón (Negras)";
+                    turnIndicator.className = "turn-negras";
+                }
+            }
+        }
+
+        function highlightMoves() {
+            validMoves.forEach(move => {
+                const cell = document.querySelector(`[data-row='${move.row}'][data-col='${move.col}']`);
+                if (cell) {
+                    cell.classList.add('valid-move');
+                    if (move.isCastling) {
+                        cell.dataset.isCastling = "true";
+                        cell.dataset.rookFromCol = move.rookFromCol;
+                        cell.dataset.rookToCol = move.rookToCol;
+                    }
+                    if (boardState[move.row][move.col] !== '') cell.classList.add('has-piece');
+                }
+            });
+        }
+
+        function movePiece(fromRow, fromCol, toRow, toCol) {
+            const piece = boardState[fromRow][fromCol];
+            const targetCell = document.querySelector(`[data-row='${toRow}'][data-col='${toCol}']`);
+            
+            if (targetCell && targetCell.dataset.isCastling === "true") {
+                const rookFromCol = parseInt(targetCell.dataset.rookFromCol);
+                const rookToCol = parseInt(targetCell.dataset.rookToCol);
+                boardState[toRow][toCol] = piece;
+                boardState[fromRow][fromCol] = '';
+                boardState[toRow][rookToCol] = boardState[toRow][rookFromCol];
+                boardState[toRow][rookFromCol] = '';
+            } else {
+                boardState[toRow][toCol] = piece;
+                boardState[fromRow][fromCol] = '';
+            }
+
+            if (piece === 'k') hasMoved.whiteKing = true;
+            if (piece === 'K') hasMoved.blackKing = true;
+            if (piece === 'r' && fromRow === 7 && fromCol === 0) hasMoved.whiteRookLeft = true;
+            if (piece === 'r' && fromRow === 7 && fromCol === 7) hasMoved.whiteRookRight = true;
+            if (piece === 'R' && fromRow === 0 && fromCol === 0) hasMoved.blackRookLeft = true;
+            if (piece === 'R' && fromRow === 0 && fromCol === 7) hasMoved.blackRookRight = true;
+
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(c => {
+                delete c.dataset.isCastling; delete c.dataset.rookFromCol; delete c.dataset.rookToCol;
+            });
+
+            // Cambiar turno y evaluar estado de la partida
+            turn = turn === 'white' ? 'black' : 'white';
+            createBoard();
+            checkGameOver();
+        }
+
+        createBoard();
+    </script>
+</body>
+</html>

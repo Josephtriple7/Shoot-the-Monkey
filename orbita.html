@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Solar 3D - Interactivo</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        
+        /* Paneles flotantes */
+        .panel {
+            position: absolute;
+            background: rgba(10, 10, 15, 0.85);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #333;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        }
+
+        /* Panel Izquierdo: Información */
+        #info {
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+        }
+        #info h3 { margin: 0 0 5px 0; color: #ffcc00; }
+        #info p { margin: 0; font-size: 14px; color: #ccc; }
+        
+        /* Panel Derecho: Controles */
+        #controls {
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 240px;
+        }
+
+        /* Estilos de Botones y Texto */
+        .btn-group { display: flex; gap: 5px; justify-content: space-between; align-items: center; }
+        button {
+            background-color: #333; color: white; border: 1px solid #555;
+            padding: 8px 10px; border-radius: 5px; cursor: pointer;
+            flex-grow: 1; transition: all 0.2s; font-size: 14px;
+        }
+        button:hover { background-color: #555; }
+        button:active { background-color: #ffcc00; color: black; border-color: #ffcc00; }
+        
+        .section-title { text-align: center; font-size: 12px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-top: 10px; border-bottom: 1px solid #444; padding-bottom: 5px; }
+        #timeDisplay { text-align: center; font-size: 18px; font-weight: bold; color: #ffcc00; margin-bottom: 5px; }
+        #focusDisplay { flex-grow: 2; text-align: center; font-weight: bold; font-size: 16px; color: #4b90ff; }
+        
+        /* Pantalla de Carga */
+        #loading {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 24px; color: white; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="loading">Cargando texturas del Sistema Solar...</div>
+
+    <div id="info" class="panel">
+        <h3>Sistema Solar 3D</h3>
+        <p>Arrastra para rotar | Rueda para Zoom</p>
+    </div>
+
+    <div id="controls" class="panel">
+        <div id="timeDisplay">Velocidad: 1.0x</div>
+        <div class="btn-group">
+            <button onclick="changeTime(-0.5)">⏪ Atrás</button>
+            <button onclick="pauseTime()">⏸ Pausa</button>
+            <button onclick="changeTime(0.5)">⏩ Adelante</button>
+        </div>
+        <button onclick="resetTime()">Restablecer Tiempo (1x)</button>
+
+        <div class="section-title">Visualización</div>
+        <button onclick="toggleTrails()" id="btnTrails">Ocultar Órbitas</button>
+
+        <div class="section-title">Enfoque de Cámara</div>
+        <div class="btn-group">
+            <button onclick="changeFocus(-1)">⬅️</button>
+            <div id="focusDisplay">Sol</div>
+            <button onclick="changeFocus(1)">➡️</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURACIÓN BÁSICA ---
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 20000);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // --- ILUMINACIÓN Y FONDO ---
+        scene.add(new THREE.AmbientLight(0x111111));
+        const sunLight = new THREE.PointLight(0xffffff, 2.5, 5000);
+        scene.add(sunLight);
+
+        const starGeo = new THREE.BufferGeometry();
+        const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.5 });
+        const starVertices = [];
+        for (let i = 0; i < 4000; i++) {
+            starVertices.push((Math.random() - 0.5) * 8000, (Math.random() - 0.5) * 8000, (Math.random() - 0.5) * 8000);
+        }
+        starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+        scene.add(new THREE.Points(starGeo, starMat));
+
+        // --- CARGADOR DE TEXTURAS ---
+        const textureLoader = new THREE.TextureLoader();
+        const baseUrl = "https://raw.githubusercontent.com/jeromeetienne/threex.planets/master/images/";
+        let texturesLoaded = 0;
+        const totalTextures = 9;
+
+        function checkLoad() {
+            texturesLoaded++;
+            if(texturesLoaded >= totalTextures) {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        // --- VARIABLES GLOBALES (UI Y FÍSICA) ---
+        const G = 0.5;
+        const baseDt = 0.8;
+        let timeScale = 1.0; 
+        let showTrails = true;
+        let currentFocusIndex = 0; // Empieza en 0 (Sol)
+
+        // Funciones UI de Tiempo
+        const timeDisplay = document.getElementById('timeDisplay');
+        window.changeTime = (amount) => { timeScale += amount; updateTimeUI(); };
+        window.pauseTime = () => { timeScale = 0; updateTimeUI(); };
+        window.resetTime = () => { timeScale = 1; updateTimeUI(); };
+        function updateTimeUI() { timeDisplay.innerText = `Velocidad: ${timeScale.toFixed(1)}x`; }
+
+        // Función UI de Órbitas
+        window.toggleTrails = () => {
+            showTrails = !showTrails;
+            document.getElementById('btnTrails').innerText = showTrails ? "Ocultar Órbitas" : "Mostrar Órbitas";
+            for (let body of bodies) {
+                if (body.trail) body.trail.visible = showTrails;
+            }
+        };
+
+        // Función UI de Cámara
+        const focusDisplay = document.getElementById('focusDisplay');
+        window.changeFocus = (dir) => {
+            currentFocusIndex += dir;
+            // Evitar salirnos del array (efecto carrusel)
+            if (currentFocusIndex < 0) currentFocusIndex = bodies.length - 1;
+            if (currentFocusIndex >= bodies.length) currentFocusIndex = 0;
+            
+            const targetBody = bodies[currentFocusIndex];
+            focusDisplay.innerText = targetBody.name;
+
+            // Teletransportar la cámara cerca del nuevo planeta para no quedar perdidos
+            let offset = targetBody.radius * 5; // Distancia dinámica según el tamaño del planeta
+            if (targetBody.name === "Sol") offset = 800; // El sol necesita más distancia
+            
+            camera.position.set(
+                targetBody.mesh.position.x + offset,
+                targetBody.mesh.position.y + (offset * 0.5),
+                targetBody.mesh.position.z + offset
+            );
+        };
+
+        // --- CLASE DE CUERPOS CELESTES ---
+        class Body {
+            constructor(name, x, z, mass, radius, textureUrl, hasRings = false) {
+                this.name = name; this.mass = mass; this.radius = radius;
+                this.vx = 0; this.vy = 0;
+                let dist = Math.sqrt(x*x + z*z);
+                this.vz = dist > 0 ? Math.sqrt(G * 10000 / dist) : 0;
+                this.ax = 0; this.ay = 0; this.az = 0;
+
+                const texture = textureLoader.load(baseUrl + textureUrl, checkLoad);
+                const geometry = new THREE.SphereGeometry(radius, 32, 32);
+                const isSun = name === "Sol";
+                
+                const material = isSun ? new THREE.MeshBasicMaterial({ map: texture }) : new THREE.MeshStandardMaterial({ map: texture, roughness: 0.5 });
+                this.mesh = new THREE.Mesh(geometry, material);
+                this.mesh.position.set(x, 0, z);
+                scene.add(this.mesh);
+
+                if (hasRings) {
+                    const ringGeo = new THREE.RingGeometry(radius + 5, radius + 20, 64);
+                    const ringTex = textureLoader.load(baseUrl + 'saturnringcolor.jpg');
+                    const ringMat = new THREE.MeshStandardMaterial({ map: ringTex, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+                    this.ringMesh = new THREE.Mesh(ringGeo, ringMat);
+                    this.ringMesh.rotation.x = Math.PI / 2 + 0.3;
+                    this.mesh.add(this.ringMesh);
+                }
+
+                this.trailPositions = [];
+                this.maxTrail = 350;
+                const trailGeo = new THREE.BufferGeometry();
+                const trailMat = new THREE.LineBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.3 });
+                this.trail = new THREE.Line(trailGeo, trailMat);
+                if (!isSun) scene.add(this.trail);
+            }
+
+            updateTrail(timeScale) {
+                if (this.name === "Sol" || !showTrails) return;
+                if (Math.abs(timeScale) > 0.01 && Math.random() < 0.2) {
+                    this.trailPositions.push(this.mesh.position.clone());
+                    if (this.trailPositions.length > this.maxTrail) this.trailPositions.shift();
+                    this.trail.geometry.setFromPoints(this.trailPositions);
+                }
+            }
+        }
+
+        // --- CREACIÓN DE CUERPOS CELESTES ---
+        const bodies = [];
+        bodies.push(new Body("Sol", 0, 0, 10000, 60, "sunmap.jpg"));
+        bodies.push(new Body("Mercurio", 120, 0, 0.5, 4, "mercurymap.jpg"));
+        bodies.push(new Body("Venus", 180, 0, 0.8, 8, "venusmap.jpg"));
+        bodies.push(new Body("Tierra", 260, 0, 1, 9, "earthmap1k.jpg"));
+        bodies.push(new Body("Marte", 340, 0, 0.6, 6, "marsmap1k.jpg"));
+        bodies.push(new Body("Júpiter", 550, 0, 50, 25, "jupitermap.jpg"));
+        bodies.push(new Body("Saturno", 800, 0, 30, 20, "saturnmap.jpg", true));
+        bodies.push(new Body("Urano", 1050, 0, 15, 14, "uranusmap.jpg"));
+        bodies.push(new Body("Neptuno", 1300, 0, 17, 13, "neptunemap.jpg"));
+
+        // Inicializar cámara en el Sol
+        camera.position.set(0, 400, 800);
+
+        // --- BUCLE FÍSICO Y RENDERIZADO ---
+        function updatePhysics() {
+            let dt = baseDt * timeScale;
+            if (Math.abs(dt) < 0.001) return; 
+
+            // Cálculos de Gravedad N-Cuerpos
+            for (let i = 0; i < bodies.length; i++) {
+                let ax = 0, ay = 0, az = 0;
+                for (let j = 0; j < bodies.length; j++) {
+                    if (i !== j) {
+                        let dx = bodies[j].mesh.position.x - bodies[i].mesh.position.x;
+                        let dy = bodies[j].mesh.position.y - bodies[i].mesh.position.y;
+                        let dz = bodies[j].mesh.position.z - bodies[i].mesh.position.z;
+                        let distSq = dx*dx + dy*dy + dz*dz;
+                        let dist = Math.sqrt(distSq);
+                        
+                        if (dist > (bodies[i].radius + bodies[j].radius)) {
+                            let force = (G * bodies[j].mass) / distSq;
+                            ax += force * (dx / dist); ay += force * (dy / dist); az += force * (dz / dist);
+                        }
+                    }
+                }
+                bodies[i].ax = ax; bodies[i].ay = ay; bodies[i].az = az;
+            }
+
+            // Aplicar Movimiento
+            for (let i = 0; i < bodies.length; i++) {
+                bodies[i].vx += bodies[i].ax * dt; bodies[i].vy += bodies[i].ay * dt; bodies[i].vz += bodies[i].az * dt;
+                bodies[i].mesh.position.x += bodies[i].vx * dt;
+                bodies[i].mesh.position.y += bodies[i].vy * dt;
+                bodies[i].mesh.position.z += bodies[i].vz * dt;
+                bodies[i].mesh.rotation.y += 0.01 * dt; // Rotación sobre su eje
+                bodies[i].updateTrail(timeScale);
+            }
+            sunLight.position.copy(bodies[0].mesh.position);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            updatePhysics();
+            
+            // Hacer que la cámara persiga el cuerpo seleccionado constantemente
+            controls.target.copy(bodies[currentFocusIndex].mesh.position);
+            controls.update(); 
+            
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
