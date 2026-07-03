@@ -5,54 +5,84 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laboratorio de Física - Ley de Gravitación Universal</title>
     <style>
+        /* =========================================================================
+           --- ESTILOS DE LA INTERFAZ DE USUARIO (CSS) ---
+           ========================================================================= */
+
+        /* Configuramos el cuerpo de la página: eliminamos márgenes y ocultamos barras de scroll 
+           para que el lienzo 3D ocupe exactamente el 100% de la ventana del navegador */
         body { margin: 0; overflow: hidden; background-color: #000; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* El elemento canvas (donde Three.js dibuja el espacio) debe actuar como un bloque sólido en pantalla */
         canvas { display: block; }
         
+        /* Contenedor flotante común para paneles sobrepuestos: fondo oscuro semitransparente, 
+           bordes redondeados y una sombra pronunciada para darle profundidad estética */
         .panel { 
             position: absolute; background: rgba(10, 10, 15, 0.9); padding: 15px; 
             border-radius: 10px; border: 1px solid #333; box-shadow: 0 4px 6px rgba(0,0,0,0.5); 
         }
         
-        /* Controles de Tiempo y Cámara (Arriba Derecha) */
+        /* Panel superior derecho: contiene los controladores del paso del tiempo y cámaras */
         #controls { top: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; width: 260px; }
+        
+        /* Agrupador horizontal de botones para que se distribuyan de forma equitativa */
         .btn-group { display: flex; gap: 5px; justify-content: space-between; align-items: center; }
+        
+        /* Botones personalizados: interactivos, con bordes suaves, cambio de cursor y una transición de color gradual */
         button { 
             background-color: #333; color: white; border: 1px solid #555; padding: 8px 10px; 
             border-radius: 5px; cursor: pointer; flex-grow: 1; transition: all 0.2s; font-size: 14px; 
         }
+        /* Cambio de color cuando el usuario pasa el puntero por encima del botón */
         button:hover { background-color: #555; }
+        /* Efecto visual momentáneo de pulsación (color amarillo/alerta) al hacer clic */
         button:active { background-color: #ffcc00; color: black; border-color: #ffcc00; }
         
+        /* Estilos específicos para los textos que muestran el estado del simulador */
         #timeDisplay { text-align: center; font-size: 16px; font-weight: bold; color: #ffcc00; margin-bottom: 5px; }
         #focusDisplay { flex-grow: 2; text-align: center; font-weight: bold; font-size: 16px; color: #4b90ff; }
+        
+        /* Títulos secundarios decorativos de la interfaz: letras pequeñas, en mayúsculas y espaciadas */
         .section-title { text-align: center; font-size: 12px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-top: 10px; border-bottom: 1px solid #444; padding-bottom: 5px; }
         
-        /* Panel de Datos y Ejercicios (Abajo) */
+        /* Panel inferior: reservado para la gran tabla de datos mutables en tiempo real */
         #dataPanel {
             bottom: 20px; left: 20px; right: 20px; height: 250px; 
             display: flex; flex-direction: column; overflow: hidden;
         }
+        /* Cabecera interna del panel inferior para alinear el título con los botones de acción global */
         .data-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .data-header h3 { margin: 0; color: #4b90ff; }
         .header-buttons { display: flex; gap: 10px; }
+        
+        /* Contenedor con scroll vertical propio para que la tabla no se desborde si agregamos muchos astros */
         .table-container { overflow-y: auto; flex-grow: 1; border: 1px solid #444; border-radius: 5px; }
         
+        /* Formateo de la tabla de variables vectoriales */
         table { width: 100%; border-collapse: collapse; text-align: center; font-size: 12px; }
+        /* Las cabeceras se mantendrán fijas arriba (sticky) aunque el usuario haga scroll hacia abajo */
         th { background: #222; position: sticky; top: 0; padding: 8px; border-bottom: 2px solid #555; color: #ffcc00; }
         td { padding: 5px; border-bottom: 1px solid #333; }
+        /* Iluminación sutil de la fila cuando pasamos el ratón por encima para mejorar el seguimiento visual */
         tr:hover { background: #1a1a1a; }
         
-        /* Inputs dentro de la tabla */
+        /* Formateo de los cuadros de entrada numérica de la tabla */
         input[type="number"] {
             width: 90px; background: #000; color: white; border: 1px solid #555; 
             border-radius: 3px; padding: 4px; text-align: center; font-family: monospace; font-size: 11px;
         }
+        /* Cuando el usuario hace clic dentro de un input para editar, el borde cambia a amarillo brillante */
         input[type="number"]:focus { outline: none; border-color: #ffcc00; background: #222; }
+        
+        /* Botón de eliminación destructiva personalizado en color rojo */
         .btn-delete { background: #aa0000; padding: 4px 8px; }
         .btn-delete:hover { background: #ff0000; }
 
+        /* Mensaje flotante centrado de carga inicial */
         #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; color: white; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; z-index: 1000; }
     </style>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
@@ -111,153 +141,243 @@
     </div>
 
     <script>
-        // --- 1. CONFIGURACIÓN BÁSICA DE THREE.JS ---
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 50000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+        /* =========================================================================
+           --- 1. CONFIGURACIÓN DEL ENTORNO GRÁFICO (THREE.JS) ---
+           ========================================================================= */
         
+        // Creamos la escena, que actúa como el espacio tridimensional vacío donde vivirán los cuerpos
+        const scene = new THREE.Scene(); 
+        
+        // Inicializamos la cámara perspectiva. Parámetros:
+        // FOV (50 grados de apertura visual), Relación de aspecto del monitor, plano de renderizado cercano (0.1), plano lejano (50000 unidades)
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 50000);
+        
+        // Creamos el renderizador WebGL que procesa los gráficos acelerados por la tarjeta de video GPU
+        const renderer = new THREE.WebGLRenderer({ antialias: true }); 
+        renderer.setSize(window.innerWidth, window.innerHeight); // Forzamos a que cubra toda la ventana
+        document.body.appendChild(renderer.domElement); // Insertamos el canvas gráfico generado dentro de nuestro HTML
+        
+        // Vinculamos los controles de órbita a la cámara para reaccionar al ratón del usuario
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true; controls.dampingFactor = 0.05;
+        controls.enableDamping = true; // Habilita la inercia (amortiguación suave) al soltar el ratón
+        controls.dampingFactor = 0.05; // Coeficiente de fricción del movimiento de la cámara
 
+        // ILUMINACIÓN:
+        // 1. Luz ambiental baja (gris oscuro 0x333333) para que las caras de los planetas que no miran al sol no queden completamente negras
         scene.add(new THREE.AmbientLight(0x333333));
+        
+        // 2. Luz puntual de alta intensidad (color blanco 0xffffff) ubicada en el origen (centro del Sol) para iluminar los astros de forma realista
         const sunLight = new THREE.PointLight(0xffffff, 3, 10000);
         scene.add(sunLight);
         
-        // Fondo estelar
-        const starGeo = new THREE.BufferGeometry();
-        const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.5 });
-        const starVertices = [];
-        for (let i = 0; i < 2000; i++) starVertices.push((Math.random() - 0.5) * 20000, (Math.random() - 0.5) * 20000, (Math.random() - 0.5) * 20000);
+        // CONSTRUCCIÓN DEL FONDO ESTELAR (SISTEMA DE PARTÍCULAS):
+        const starGeo = new THREE.BufferGeometry(); // Contenedor geométrico optimizado para miles de puntos
+        const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.5 }); // Material básico para los puntos (estrellas)
+        const starVertices = []; // Arreglo para almacenar las posiciones X, Y, Z aleatorias de cada estrella
+        for (let i = 0; i < 2000; i++) {
+            // Generamos coordenadas aleatorias en un rango gigante de dispersión de 20,000 unidades virtuales
+            starVertices.push((Math.random() - 0.5) * 20000, (Math.random() - 0.5) * 20000, (Math.random() - 0.5) * 20000);
+        }
+        // Asignamos las posiciones calculadas al objeto geométrico de Three.js
         starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
-        scene.add(new THREE.Points(starGeo, starMat));
+        scene.add(new THREE.Points(starGeo, starMat)); // Construimos el objeto final y lo añadimos al espacio
 
+        // CARGADOR DE TEXTURAS EN LÍNEA:
         const textureLoader = new THREE.TextureLoader();
         const baseUrl = "https://raw.githubusercontent.com/jeromeetienne/threex.planets/master/images/";
         let texturesLoaded = 0;
+        // Función verificadora: oculta la pantalla de carga cuando las texturas principales se hayan descargado del servidor
         function checkLoad() {
             texturesLoaded++;
             if(texturesLoaded >= 3) document.getElementById('loading').style.display = 'none';
         }
 
-        // --- 2. FACTORES DE ESCALA (MÉTRICO REAL -> PANTALLA 3D) ---
-        // 1 Unidad en Three.js equivaldrá a 1,000,000,000 metros (1e9 m) en el espacio real.
+        /* =========================================================================
+           --- 2. ESCALAS DE CONVERSIÓN FÍSICA A ENTORNO VIRTUAL GRÁFICO ---
+           ========================================================================= */
+        
+        // ESCALA VISUAL CRÍTICA: La distancia real de la Tierra al Sol es de 150,000,000,000 metros (150e9 m). 
+        // Si dibujamos esa distancia directamente en Three.js, las tarjetas de video fallan por precisión numérica.
+        // Por ende, definimos que 1 unidad de pantalla equivale a 1,000,000,000 metros reales (1e9 m). 
+        // Así, la Tierra se posicionará gráficamente a 150 unidades del Sol.
         const VISUAL_SCALE = 1e9; 
-        let G = 6.67e-11; 
-        const baseDt = 86400 / 2; // Medio día por frame por defecto
-        let timeScale = 1.0; 
-        let showTrails = true;
-        let currentFocusIndex = 0;
+        
+        // CONSTANTES Y VARIABLES DEL MOTOR DE INTEGRACIÓN:
+        let G = 6.67e-11; // Constante de Gravitación Universal G establecida en el documento original.
+        const baseDt = 86400 / 2; // Fracción base de tiempo por iteración en segundos (En este caso, 43,200 segundos = 12 horas reales por fotograma)
+        let timeScale = 1.0; // Multiplicador dinámico para acelerar, pausar o ralentizar el flujo temporal
+        let showTrails = true; // Flag booleano que controla si se pintan o no las estelas orbitales
+        let currentFocusIndex = 0; // Índice numérico que indica cuál es el cuerpo celeste bajo el foco directo de la cámara
 
-        // --- 3. CLASE CUERPO CELESTE ---
+        /* =========================================================================
+           --- 3. CLASE CUERPO CELESTE (FÍSICA VECTORIAL + ENLACE GRÁFICO) ---
+           ========================================================================= */
         class Body {
             constructor(name, xMetros, zMetros, vx, vz, mass, visualRadius, textureUrl, customColor = null) {
-                this.name = name; 
-                this.mass = mass;
-                this.radius = visualRadius; // Radio meramente representativo para que se vea
+                this.name = name; // Identificador en texto del astro (Ej: "Tierra")
+                this.mass = mass; // Masa absoluta medida en Kilogramos (kg)
+                this.radius = visualRadius; // Tamaño radial estético para que el planeta sea visible en pantalla
                 
-                // Vectores de Estado Físicos Reales (Métricas del documento)
-                this.x = xMetros;
-                this.y = 0;
-                this.z = zMetros;
-                this.vx = vx;
-                this.vy = 0;
-                this.vz = vz;
+                // VECTORES DE ESTADO FÍSICO REAL (Sistemas métricos MKS en 3D):
+                // Aunque la simulación corre principalmente en un plano plano 2D (X y Z), se estructuran en 3D para escalabilidad.
+                this.x = xMetros; // Posición X actual en el espacio real (metros)
+                this.y = 0;       // Posición Y fijada en cero para órbitas coplanares estables
+                this.z = zMetros; // Posición Z actual en el espacio real (metros)
                 
-                this.ax = 0; this.ay = 0; this.az = 0;
-                this.fx = 0; this.fy = 0; this.fz = 0;
+                this.vx = vx;     // Vector velocidad componente X (metros por segundo, m/s)
+                this.vy = 0;      // Vector velocidad componente Y (m/s)
+                this.vz = vz;     // Vector velocidad componente Z (m/s)
+                
+                // VECTORES DINÁMICOS ACUMULADORES:
+                this.ax = 0; this.ay = 0; this.az = 0; // Aceleración instantánea (m/s²) -> Derivada de la velocidad (dv/dt)
+                this.fx = 0; this.fy = 0; this.fz = 0; // Fuerza neta resultante (Newtons, N) -> Sumatoria vectorial de fuerzas
 
-                const geometry = new THREE.SphereGeometry(visualRadius, 32, 32);
+                // INSTANCIACIÓN GEOMÉTRICA DE LA ESFERA TRIDIMENSIONAL:
+                const geometry = new THREE.SphereGeometry(visualRadius, 32, 32); // Esfera con 32 segmentos para que se vea redondeada
                 let material;
                 
+                // Si pasamos una URL válida, descargamos la textura planetaria real correspondientes
                 if (textureUrl) {
                     const texture = textureLoader.load(baseUrl + textureUrl, checkLoad);
+                    // El Sol utiliza MeshBasicMaterial para no depender de luces y emitir brillo intrínseco.
+                    // Los planetas usan MeshStandardMaterial para reaccionar físicamente a la luz arrojada por el Sol.
                     material = name === "Sol" ? new THREE.MeshBasicMaterial({ map: texture }) : new THREE.MeshStandardMaterial({ map: texture, roughness: 0.5 });
                 } else {
+                    // Si no hay textura en línea, creamos un material mate basado en un color sólido
                     material = new THREE.MeshStandardMaterial({ color: customColor || 0xffffff, roughness: 0.5 });
                     checkLoad(); 
                 }
 
-                this.mesh = new THREE.Mesh(geometry, material);
-                // Posicionamos en el entorno visual escalando las unidades
+                this.mesh = new THREE.Mesh(geometry, material); // Enlazamos la geometría con el material en un objeto compuesto (Malla)
+                
+                // TRADUCCIÓN OBLIGATORIA DE METROS REALES A UNIDADES GRÁFICAS:
+                // Posicionamos la malla dividiendo los metros reales del constructor entre nuestro factor de escala (1e9)
                 this.mesh.position.set(this.x / VISUAL_SCALE, this.y / VISUAL_SCALE, this.z / VISUAL_SCALE);
-                scene.add(this.mesh);
+                scene.add(this.mesh); // Agregamos la esfera visual al espacio virtual de Three.js
 
-                this.trailPositions = [];
+                // INICIALIZACIÓN DEL RASTRO DE LA ÓRBITA (TRAILS):
+                this.trailPositions = []; // Arreglo histórico donde guardaremos los vectores de posición por los que ha pasado
+                // Creamos una línea continua de color personalizado con opacidad reducida para no saturar la vista
                 this.trail = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: customColor || 0x888888, transparent: true, opacity: 0.4 }));
-                scene.add(this.trail);
+                scene.add(this.trail); // Insertamos la línea en la escena
             }
 
+            // Sincroniza la posición gráfica en pantalla (Malla 3D) con el estado matemático calculado por el motor físico
             updateVisuals() {
                 this.mesh.position.set(this.x / VISUAL_SCALE, this.y / VISUAL_SCALE, this.z / VISUAL_SCALE);
             }
 
+            // Captura la huella del camino orbital recorrido agregando coordenadas al arreglo histórico
             updateTrail() {
-                if (!showTrails) return;
+                if (!showTrails) return; // Si el botón de ocultar órbitas está activo, salimos de inmediato
+                
+                // Para evitar un consumo excesivo de memoria RAM, guardamos una muestra sólo si la simulación avanza
+                // y mediante una probabilidad aleatoria controlada (30% de los fotogramas)
                 if (Math.abs(timeScale) > 0.01 && Math.random() < 0.3) {
-                    this.trailPositions.push(this.mesh.position.clone());
+                    this.trailPositions.push(this.mesh.position.clone()); // Clonamos la posición visual actual
+                    
+                    // Si la estela supera los 500 puntos históricos, eliminamos el más antiguo (Estructura de cola FIFO)
                     if (this.trailPositions.length > 500) this.trailPositions.shift();
+                    
+                    // Actualizamos la geometría interna de la línea en tiempo real con el nuevo listado de puntos
                     this.trail.geometry.setFromPoints(this.trailPositions);
                 }
             }
         }
 
-        // --- 4. SISTEMA DE REINICIO CON VALORES DEL DOCUMENTO ---
-        const bodies = [];
+        /* =========================================================================
+           --- 4. INICIALIZACIÓN DEL SISTEMA CON LOS DATOS REALES DE LA GUÍA ---
+           ========================================================================= */
+        const bodies = []; // Arreglo maestro global que albergará todas las instancias de objetos 'Body'
 
         function buildDefaultSolarSystem() {
+            // CICLO DE LIMPIEZA TOTAL: Si ya existían cuerpos (por un reinicio), los removemos por completo de la escena
             for (let i = 0; i < bodies.length; i++) {
                 scene.remove(bodies[i].mesh);
                 scene.remove(bodies[i].trail);
             }
-            bodies.length = 0;
+            bodies.length = 0; // Vaciamos el arreglo de memoria
 
-            // Datos exactos de la guía:
-            // Sol: masa = 1.989 x 10^30 kg
+            // DATOS EXTRAÍDOS DIRECTAMENTE DEL DOCUMENTO DE TRABAJO ENVIADO:
+            
+            // 1. EL SOL: Ubicado estático en el origen (0,0), masa exacta de 1.989 x 10^30 kg. Radio estético = 25 unidades.
             bodies.push(new Body("Sol", 0, 0, 0, 0, 1.989e30, 25, "sunmap.jpg", 0xffcc00));
             
-            // Tierra: r = 150 x 10^9 m, v = 29885 m/s, masa = 5.972 x 10^24 kg
+            // 2. LA TIERRA: Distancia inicial al Sol (Eje X) = 150 x 10^9 metros. 
+            // Velocidad tangencial inicial (Eje Z) calculada en la guía = 29,885 m/s. Masa = 5.972 x 10^24 kg.
             bodies.push(new Body("Tierra", 150e9, 0, 0, 29885, 5.972e24, 10, "earthmap1k.jpg", 0x4b90ff));
 
-            // Luna (Opcional del documento: masa ~7.34e22, a 384,400,000m de la Tierra, v_orbital_relativa ~1022 m/s)
+            /* 3. LA LUNA: Ejemplo de interacción multicuerpo avanzada descrita al final de tu documento.
+             Posicionamiento relativo: Colocamos la Luna en el eje X sumando la distancia Sol-Tierra más la distancia Tierra-Luna (0.3844e9 metros).
+             Velocidad orbital en Z: Debe llevar la misma velocidad base de la Tierra (29,885 m/s) más su propia velocidad orbital respecto a la Tierra (~1,022 m/s).
+             Masa de la luna = 7.342 x 10^22 kg.
+            */
             bodies.push(new Body("Luna", 150e9 + 0.3844e9, 0, 0, 29885 + 1022, 7.342e22, 3, null, 0xaaaaaa));
 
-            currentFocusIndex = 0;
-            camera.position.set(0, 200, 400);
-            controls.target.set(0,0,0);
+            currentFocusIndex = 0; // Enfocamos por defecto al Sol al arrancar
+            camera.position.set(0, 200, 400); // Elevamos y alejamos la perspectiva de la cámara para apreciar todo el plano orbital
+            controls.target.set(0,0,0); // Forzamos a que el pivote del ratón apunte al centro del universo
         }
 
+        // Ejecución obligatoria inicial del constructor del sistema planetario por defecto
         buildDefaultSolarSystem();
 
+        // Función global vinculada al botón HTML para restablecer de fábrica los parámetros alterados
         window.resetSystem = () => {
             if(confirm("¿Restablecer a los valores por defecto del documento de Física?")) {
-                G = 6.67e-11;
-                document.getElementById('globalG').value = "6.67e-11";
-                timeScale = 1.0;
+                G = 6.67e-11; // Retorna la gravedad a su valor real de Newton
+                document.getElementById('globalG').value = "6.67e-11"; // Actualiza el cuadro de texto
+                timeScale = 1.0; // Restablece el flujo de tiempo normal
                 document.getElementById('timeDisplay').innerText = `Paso Temporal (dt): ${(baseDt * timeScale).toFixed(0)}s/frame`;
-                buildDefaultSolarSystem();
-                renderTable();
+                buildDefaultSolarSystem(); // Reconstruye los astros iniciales
+                renderTable(); // Redibuja las celdas de la tabla HTML
             }
         };
 
-        // --- 5. LÓGICA DE INTERFAZ Y EDICIÓN DE CÉLULAS REALES ---
+        /* =========================================================================
+           --- 5. INTERFAZ GRÁFICA EDITABLE (VÍNCULO HTML <=> DATA CELULAR) ---
+           ========================================================================= */
         const timeDisplay = document.getElementById('timeDisplay');
-        window.changeTime = (factor) => { timeScale *= factor; timeDisplay.innerText = `Paso Temporal (dt): ${(baseDt * timeScale).toFixed(0)}s/frame`; };
-        window.pauseTime = () => { timeScale = 0; timeDisplay.innerText = `Simulación Pausada`; };
-        window.toggleTrails = () => { showTrails = !showTrails; document.getElementById('btnTrails').innerText = showTrails ? "Ocultar Órbitas" : "Mostrar Órbitas"; for (let b of bodies) b.trail.visible = showTrails; };
-        window.updateGlobalG = () => { G = parseFloat(document.getElementById('globalG').value) || 6.67e-11; };
-
-        const focusDisplay = document.getElementById('focusDisplay');
-        window.changeFocus = (dir) => {
-            if (bodies.length === 0) return;
-            currentFocusIndex = (currentFocusIndex + dir + bodies.length) % bodies.length;
-            focusDisplay.innerText = bodies[currentFocusIndex].name;
+        
+        // Modifica la velocidad del tiempo multiplicándola por el factor recibido (Ej: x2 acelera, x0.5 frena)
+        window.changeTime = (factor) => { 
+            timeScale *= factor; 
+            timeDisplay.innerText = `Paso Temporal (dt): ${(baseDt * timeScale).toFixed(0)}s/frame`; 
+        };
+        
+        // Pausa por completo la simulación congelando el paso temporal a cero
+        window.pauseTime = () => { 
+            timeScale = 0; 
+            timeDisplay.innerText = `Simulación Pausada`; 
+        };
+        
+        // Alterna el renderizado visual de las líneas elípticas de las órbitas
+        window.toggleTrails = () => { 
+            showTrails = !showTrails; 
+            document.getElementById('btnTrails').innerText = showTrails ? "Ocultar Órbitas" : "Mostrar Órbitas"; 
+            for (let b of bodies) b.trail.visible = showTrails; // Aplica el cambio de visibilidad a cada cuerpo
+        };
+        
+        // Lee la caja de texto de G y la actualiza en el motor numérico (permite simular universos con gravedades extremas)
+        window.updateGlobalG = () => { 
+            G = parseFloat(document.getElementById('globalG').value) || 6.67e-11; 
         };
 
+        const focusDisplay = document.getElementById('focusDisplay');
+        
+        // Desplaza cíclicamente el índice de enfoque de la cámara por medio del arreglo de astros
+        window.changeFocus = (dir) => {
+            if (bodies.length === 0) return;
+            // Aritmética modular para que al pasar del último elemento vuelva al primero, y viceversa
+            currentFocusIndex = (currentFocusIndex + dir + bodies.length) % bodies.length;
+            focusDisplay.innerText = bodies[currentFocusIndex].name; // Actualiza el texto de la UI
+        };
+
+        // RENDER DE TABLA EDITABLE: Genera dinámicamente bloques de inputs HTML inyectados al DOM
         function renderTable() {
             let html = '';
             bodies.forEach((b, i) => {
+                // Inyectamos plantillas de texto literales (template literals) cargando los datos físicos en notación científica (.toExponential)
                 html += `<tr>
                     <td><strong>${b.name}</strong></td>
                     <td><input type="number" id="m_${i}" value="${b.mass.toExponential(3)}" onchange="updateBodyData(${i})"></td>
@@ -268,12 +388,17 @@
                     <td><button class="btn-delete" onclick="deleteBody(${i})">❌</button></td>
                 </tr>`;
             });
-            document.getElementById('tableBody').innerHTML = html;
+            document.getElementById('tableBody').innerHTML = html; // Inyección directa en el cuerpo de la tabla
             focusDisplay.innerText = bodies[currentFocusIndex] ? bodies[currentFocusIndex].name : "Ninguno";
         }
 
+        // REFRESCO EN TIEMPO REAL: Sobreescribe los números de las celdas a medida que los planetas se trasladan por el espacio
         function updateTableRealTime() {
-            if (!document.hasFocus() || document.activeElement.tagName === 'INPUT') return;
+            /* SALVAGUARDA DE ESCRITURA: Si la ventana del navegador perdió foco o el usuario está escribiendo dentro de una celda (`INPUT`), 
+             bloqueamos el refresco automático para evitar borrarle los datos que está digitando en ese instante.
+            */
+             if (!document.hasFocus() || document.activeElement.tagName === 'INPUT') return;
+            
             bodies.forEach((b, i) => {
                 let px = document.getElementById(`px_${i}`); if(px) px.value = b.x.toExponential(3);
                 let pz = document.getElementById(`pz_${i}`); if(pz) pz.value = b.z.toExponential(3);
@@ -282,137 +407,188 @@
             });
         }
 
+        // CAPTURA DE EDICIÓN CELULAR: Se dispara inmediatamente cuando el usuario cambia un valor numérico en la tabla y presiona Enter
         window.updateBodyData = (i) => {
             let b = bodies[i];
+            // Rescatamos los strings de las celdas y los parseamos a flotantes reales de JavaScript
             b.mass = parseFloat(document.getElementById(`m_${i}`).value) || 0;
             b.x = parseFloat(document.getElementById(`px_${i}`).value) || 0;
             b.z = parseFloat(document.getElementById(`pz_${i}`).value) || 0;
             b.vx = parseFloat(document.getElementById(`vx_${i}`).value) || 0;
             b.vz = parseFloat(document.getElementById(`vz_${i}`).value) || 0;
             
-            b.trailPositions = [];
+            // Si el usuario teletransportó el planeta manualmente, borramos la estela orbital vieja para que no cruce líneas erráticas
+            b.trailPositions = []; 
             b.trail.geometry.setFromPoints([]);
-            b.updateVisuals();
+            b.updateVisuals(); // Forzamos actualización gráfica de inmediato
         };
 
+        // AGREGA UN PLANETA NUEVO: Permite al estudiante realizar experimentos inyectando masas arbitrarias en órbitas aleatorias
         window.addCustomBody = () => {
             let name = prompt("Nombre del cuerpo:", "Marte") || "Planeta X";
             let mass = parseFloat(prompt("Masa (en kg, ej. Marte es 6.39e23):", "6.39e23")) || 1e24;
             let posX = parseFloat(prompt("Distancia al Sol en metros X (ej. 228e9):", "228e9")) || 200e9;
             let velZ = parseFloat(prompt("Velocidad Orbital tangencial en m/s (ej. 24000):", "24000")) || 24000;
             
-            let color = Math.random() * 0xffffff;
+            let color = Math.random() * 0xffffff; // Le asignamos un color aleatorio hexadecimal brillante
+            // Instanciamos el nuevo cuerpo celeste pasando los datos capturados en las ventanas emergentes
             let b = new Body(name, posX, 0, 0, velZ, mass, 7, null, color);
-            bodies.push(b);
-            renderTable();
+            bodies.push(b); // Lo empujamos al arreglo global para que el motor físico empiece a calcularlo
+            renderTable(); // Re-renderizamos los controles de la interfaz
         };
 
+        // Elimina de raíz un planeta destruyendo tanto su masa matemática como sus mallas 3D de la escena visual
         window.deleteBody = (i) => {
             if(confirm(`¿Eliminar a ${bodies[i].name}?`)) {
-                scene.remove(bodies[i].mesh);
-                scene.remove(bodies[i].trail);
-                bodies.splice(i, 1);
-                renderTable();
+                scene.remove(bodies[i].mesh); // Remueve la esfera de Three.js
+                scene.remove(bodies[i].trail); // Remueve la órbita de Three.js
+                bodies.splice(i, 1); // Corta el casillero del arreglo
+                renderTable(); // Reestructura la tabla
             }
         };
 
-        renderTable();
+        renderTable(); // Llamado inicial obligatorio para pintar la tabla por primera vez
 
-        // --- 6. MOTOR FÍSICO VECTORIAL (Leyes de Newton del documento) ---
-        let frameCounter = 0;
+        /* =========================================================================
+           --- 6. MOTOR FÍSICO VECTORIAL (RESOLUCIÓN MATEMÁTICA DE LA GUÍA) ---
+           ========================================================================= */
+        let frameCounter = 0; // Contador auxiliar de ciclos utilizado para temporizar la interfaz de usuario
 
         function updatePhysics() {
-            let dt = baseDt * timeScale;
-            if (dt === 0) return;
+            let dt = baseDt * timeScale; // El diferencial de tiempo por fotograma (Afectado por los controles de aceleración)
+            if (dt === 0) return; // Si el simulador está en pausa, cancelamos la ejecución matemática del bucle
 
-            // 1. Resetear fuerzas (Fneta = 0)
+            /* ---------------------------------------------------------------------
+             PASO 1: RESETEO DE FUERZAS NETAS (F_neta = 0)
+             Antes de recalcular las atracciones mutuas del nuevo instante, vaciamos a cero los acumuladores
+             de fuerza neta de cada astro [F_neta = F1 + F2 + ... + Fn]
+             ---------------------------------------------------------------------*/
             for (let i = 0; i < bodies.length; i++) {
                 bodies[i].fx = 0; bodies[i].fy = 0; bodies[i].fz = 0;
             }
 
-            // 2. Calcular gravedad mutua: F = G * (m1 * m2) / r²
+            /* ---------------------------------------------------------------------
+             PASO 2: CÁLCULO DE INTERACCIONES CRUZADAS POR PARES (LEY DE NEWTON)
+             Ejecutamos un algoritmo de emparejamiento doble de orden O(N²).
+             Empezamos el segundo bucle en 'j = i + 1' para aplicar el principio de Acción y Reacción (3ra ley de Newton), 
+             evitando calcular de forma redundante la atracción de i contra j y luego j contra i.
+             ---------------------------------------------------------------------*/
             for (let i = 0; i < bodies.length; i++) {
                 for (let j = i + 1; j < bodies.length; j++) { 
+                    
+                    // Calculamos los componentes del vector de distancia delta ($\vec{r}$) apuntando desde el astro 'i' al 'j'
                     let dx = bodies[j].x - bodies[i].x;
                     let dy = bodies[j].y - bodies[i].y;
                     let dz = bodies[j].z - bodies[i].z;
                     
-                    let distSq = dx*dx + dy*dy + dz*dz;
-                    let dist = Math.sqrt(distSq);
+                    // Aplicamos el teorema de Pitágoras tridimensional para hallar el cuadrado de la distancia ($r^2$)
+                    let distSq = dx*dx + dy*dy + dz*dz; 
+                    let dist = Math.sqrt(distSq); // Calculamos la magnitud de la distancia lineal ($r$)
                     
+                    // Salvaguarda contra divisiones por cero (evita que el programa estalle si dos planetas colisionan exactamente)
                     if (dist > 0) {
-                        // Ley de gravitación universal
+                        // APLICACIÓN DIRECTA DE LA LEY DE GRAVITACIÓN UNIVERSAL DE NEWTON:
+                        // Magnitud de la fuerza de atracción: F = G * (m1 * m2) / r²
                         let forceMagnitude = (G * bodies[i].mass * bodies[j].mass) / distSq;
                         
-                        // Componentes vectoriales de la fuerza dirección unitaria
+                        // DESCOMPOSICIÓN VECTORIAL COMPONENTE POR COMPONENTE:
+                        // Multiplicamos la magnitud escalar de la fuerza por el vector unitario director (dirección/distancia)
                         let fx = forceMagnitude * (dx / dist);
                         let fy = forceMagnitude * (dy / dist);
                         let fz = forceMagnitude * (dz / dist);
 
-                        // Principio de Acción y Reacción (Fneta = F1 + F2...)
+                        // TERCERA LEY DE NEWTON (ACCIÓN Y REACCIÓN):
+                        // La fuerza con la que 'j' atrae a 'i' es exactamente igual y de sentido opuesto a la que 'i' atrae a 'j'.
+                        // Por lo tanto, sumamos vectorialmente las fuerzas al cuerpo 'i' (+) y se las restamos al cuerpo 'j' (-)
                         bodies[i].fx += fx; bodies[i].fy += fy; bodies[i].fz += fz;
                         bodies[j].fx -= fx; bodies[j].fy -= fy; bodies[j].fz -= fz;
                     }
                 }
             }
 
-            // 3. Integración de Newton: a = F / m -> vf = v0 + a*dt -> rf = r0 + v*dt
+            /* ---------------------------------------------------------------------
+             PASO 3: INTEGRACIÓN NUMÉRICA DE EULER (ACTUALIZACIÓN DE VELOCIDAD Y POSICIÓN)
+             Con las fuerzas netas totales consolidadas para cada cuerpo por separado, despejamos aceleraciones 
+             y aplicamos los diferenciales temporales descritos analíticamente en tu guía de física.
+             ---------------------------------------------------------------------*/
             for (let i = 0; i < bodies.length; i++) {
                 let body = bodies[i];
+                
+                // SEGUNDA LEY DE NEWTON (Despeje algebraico de la aceleración):
+                // F_neta = m * a  ===>  a = F_neta / m
                 if (body.mass > 0) {
                     body.ax = body.fx / body.mass;
                     body.ay = body.fy / body.mass;
                     body.az = body.fz / body.mass;
                 }
 
-                // Cambios en velocidad
+                // RELACIÓN ENTRE VELOCIDAD Y ACELERACIÓN (Ecuación cinemática discreta):
+                // v_final = v_inicial + a * dt
                 body.vx += body.ax * dt; 
                 body.vy += body.ay * dt; 
                 body.vz += body.az * dt;
 
-                // Cambios en posición
+                // RELACIÓN ENTRE POSICIÓN Y VELOCIDAD (Ecuación cinemática discreta):
+                // r_final = r_inicial + v * dt
                 body.x += body.vx * dt;
                 body.y += body.vy * dt;
                 body.z += body.vz * dt;
                 
-                // Actualizar la malla 3D escalada y su estela
-                body.updateVisuals();
-                body.mesh.rotation.y += 0.005; 
-                body.updateTrail();
+                // REPERCUSIÓN GRÁFICA INMEDIATA:
+                body.updateVisuals(); // Reposiciona la esfera 3D según los nuevos metros calculados
+                body.mesh.rotation.y += 0.005; // Rotación estética intrínseca constante (el planeta gira sobre su propio eje geográfico)
+                body.updateTrail(); // Añade un fragmento lineal para consolidar el histórico de la elipse orbital
             }
             
+            /* DINÁMICA DE LUCES CENTRALES: Si el Sol llega a desplazarse sutilmente por el tirón gravitacional de júpiter u otros astros,
+             forzamos a que el foco luminoso puntual se mueva junto a la esfera del Sol para conservar la iluminación realista.*/
             if(bodies.length > 0 && bodies[0].name === "Sol") {
                 sunLight.position.copy(bodies[0].mesh.position);
             }
         }
 
+        /* =========================================================================
+           --- 7. BUCLE DE RENDIMIENTO Y RENDERIZADO PRINCIPAL (ANIMATE LOOP) ---
+           ========================================================================= */
         function animate() {
-            requestAnimationFrame(animate);
-            updatePhysics();
+            // Schedulamos recursivamente la función para sincronizarse de manera nativa con la tasa de refresco (Hz) de la pantalla
+            requestAnimationFrame(animate); 
             
+            updatePhysics(); // Ejecuta las operaciones matemáticas del motor planetario de Newton
+            
+            /* OPTIMIZACIÓN DE RENDIMIENTO DE LA UI: Reescribir textos en el árbol HTML (DOM) es una operación muy pesada. 
+             En vez de actualizar la tabla 60 veces por segundo de forma violenta, usamos un amortiguador (Muffler) 
+             para refrescar los números de la tabla únicamente una vez cada 15 fotogramas. El ojo humano no notará la diferencia.*/
             frameCounter++;
             if(frameCounter % 15 === 0) {
                 updateTableRealTime();
             }
 
-            if(bodies[currentFocusIndex]) {
+            /* SEGUIMIENTO DE CÁMARA INTERACTIVO: Si tenemos un planeta fijado bajo el foco, forzamos a que el centro orbital
+             // de la cámara apunte y se fije rígidamente en la coordenada de la malla virtual de dicho astro.*/
+             if(bodies[currentFocusIndex]) {
                 let targetPos = bodies[currentFocusIndex].mesh.position;
-                controls.target.copy(targetPos);
+                controls.target.copy(targetPos); // El pivote se mueve con el planeta
             }
-            controls.update(); 
-            renderer.render(scene, camera);
+            
+            controls.update(); // Informa a la cámara que aplique las inercias y actualizaciones del arrastre del ratón
+            renderer.render(scene, camera); // Redibuja por completo la escena y toma la captura fotográfica desde el lente de la cámara
         }
 
+        /* CONTROLADOR DE REDIMENSIONAMIENTO AUTOMÁTICO (RESPONSIVE): 
+         Si el usuario maximiza el navegador o cambia el tamaño de la ventana, recalculamos las proporciones ópticas 
+         para evitar que los planetas se vean estirados como óvalos desfigurados.*/
         window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight; // Actualiza relación de aspecto ancho/alto
+            camera.updateProjectionMatrix(); // Fuerza el refresco de las matrices de proyección de la lente perspectiva
+            renderer.setSize(window.innerWidth, window.innerHeight); // Redimensiona el lienzo de WebGL
         });
 
-        // Asegurar que el cargador termine rápido si no hay texturas externas listadas
+        /* Retardo controlado para desvanecer y ocultar la cortina de carga inicial transcurridos 1.5 segundos */
         setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 1500);
 
-        animate();
+        // LANZAMIENTO OFICIAL DEL SIMULADOR: Dispara el bucle infinito de renderizado por primera vez
+        animate(); 
     </script>
 </body>
 </html>
