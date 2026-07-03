@@ -69,12 +69,15 @@
         
         /* Formateo de los cuadros de entrada numérica de la tabla */
         input[type="number"] {
-            width: 90px; background: #000; color: white; border: 1px solid #555; 
+            width: 85px; background: #000; color: white; border: 1px solid #555; 
             border-radius: 3px; padding: 4px; text-align: center; font-family: monospace; font-size: 11px;
         }
         /* Cuando el usuario hace clic dentro de un input para editar, el borde cambia a amarillo brillante */
         input[type="number"]:focus { outline: none; border-color: #ffcc00; background: #222; }
         
+        /* Etiqueta especial de solo lectura para la columna de fuerza */
+        .force-cell { font-family: monospace; font-size: 11px; color: #00ffcc; font-weight: bold; }
+
         /* Botón de eliminación destructiva personalizado en color rojo */
         .btn-delete { background: #aa0000; padding: 4px 8px; }
         .btn-delete:hover { background: #ff0000; }
@@ -131,6 +134,7 @@
                         <th>Posición Z (m)</th>
                         <th>Velocidad X (m/s)</th>
                         <th>Velocidad Z (m/s)</th>
+                        <th>Fuerza Neta (N)</th>
                         <th>Eliminar</th>
                     </tr>
                 </thead>
@@ -283,6 +287,12 @@
                     this.trail.geometry.setFromPoints(this.trailPositions);
                 }
             }
+
+            // NUEVA FUNCIÓN MATEMÁTICA: Aplica el Teorema de Pitágoras vectorial para extraer la 
+            // magnitud o módulo de la fuerza neta total que está experimentando el cuerpo celeste.
+            getForceMagnitude() {
+                return Math.sqrt(this.fx * this.fx + this.fy * this.fy + this.fz * this.fz);
+            }
         }
 
         /* =========================================================================
@@ -307,11 +317,10 @@
             // Velocidad tangencial inicial (Eje Z) calculada en la guía = 29,885 m/s. Masa = 5.972 x 10^24 kg.
             bodies.push(new Body("Tierra", 150e9, 0, 0, 29885, 5.972e24, 10, "earthmap1k.jpg", 0x4b90ff));
 
-            /* 3. LA LUNA: Ejemplo de interacción multicuerpo avanzada descrita al final de tu documento.
-             Posicionamiento relativo: Colocamos la Luna en el eje X sumando la distancia Sol-Tierra más la distancia Tierra-Luna (0.3844e9 metros).
-             Velocidad orbital en Z: Debe llevar la misma velocidad base de la Tierra (29,885 m/s) más su propia velocidad orbital respecto a la Tierra (~1,022 m/s).
-             Masa de la luna = 7.342 x 10^22 kg.
-            */
+            // 3. LA LUNA: Ejemplo de interacción multicuerpo avanzada descrita al final de tu documento.
+            // Posicionamiento relativo: Colocamos la Luna en el eje X sumando la distancia Sol-Tierra más la distancia Tierra-Luna (0.3844e9 metros).
+            // Velocidad orbital en Z: Debe llevar la misma velocidad base de la Tierra (29,885 m/s) más su propia velocidad orbital respecto a la Tierra (~1,022 m/s).
+            // Masa de la luna = 7.342 x 10^22 kg.
             bodies.push(new Body("Luna", 150e9 + 0.3844e9, 0, 0, 29885 + 1022, 7.342e22, 3, null, 0xaaaaaa));
 
             currentFocusIndex = 0; // Enfocamos por defecto al Sol al arrancar
@@ -377,7 +386,7 @@
         function renderTable() {
             let html = '';
             bodies.forEach((b, i) => {
-                // Inyectamos plantillas de texto literales (template literals) cargando los datos físicos en notación científica (.toExponential)
+                // He añadido el tag <span class="force-cell"> para renderizar la columna de fuerza gravitatoria en tiempo real
                 html += `<tr>
                     <td><strong>${b.name}</strong></td>
                     <td><input type="number" id="m_${i}" value="${b.mass.toExponential(3)}" onchange="updateBodyData(${i})"></td>
@@ -385,6 +394,7 @@
                     <td><input type="number" id="pz_${i}" value="${b.z.toExponential(3)}" onchange="updateBodyData(${i})"></td>
                     <td><input type="number" id="vx_${i}" value="${b.vx.toFixed(1)}" onchange="updateBodyData(${i})"></td>
                     <td><input type="number" id="vz_${i}" value="${b.vz.toFixed(1)}" onchange="updateBodyData(${i})"></td>
+                    <td><span id="f_${i}" class="force-cell">${b.getForceMagnitude().toExponential(3)} N</span></td>
                     <td><button class="btn-delete" onclick="deleteBody(${i})">❌</button></td>
                 </tr>`;
             });
@@ -394,12 +404,16 @@
 
         // REFRESCO EN TIEMPO REAL: Sobreescribe los números de las celdas a medida que los planetas se trasladan por el espacio
         function updateTableRealTime() {
-            /* SALVAGUARDA DE ESCRITURA: Si la ventana del navegador perdió foco o el usuario está escribiendo dentro de una celda (`INPUT`), 
-             bloqueamos el refresco automático para evitar borrarle los datos que está digitando en ese instante.
-            */
-             if (!document.hasFocus() || document.activeElement.tagName === 'INPUT') return;
-            
             bodies.forEach((b, i) => {
+                // LA FUERZA SIEMPRE SE ACTUALIZA: Como la fuerza es de solo lectura y el usuario no puede escribir en ella, 
+                // la refrescamos en cada ciclo sin importar si hay inputs enfocados.
+                let fCell = document.getElementById(`f_${i}`);
+                if(fCell) fCell.innerText = b.getForceMagnitude().toExponential(3) + " N";
+
+                // SALVAGUARDA DE ESCRITURA: Si el usuario está editando un cuadro numérico, no modificamos las posiciones o velocidades
+                // para evitar borrarle los datos que está digitando en ese instante.
+                if (!document.hasFocus() || document.activeElement.tagName === 'INPUT') return;
+                
                 let px = document.getElementById(`px_${i}`); if(px) px.value = b.x.toExponential(3);
                 let pz = document.getElementById(`pz_${i}`); if(pz) pz.value = b.z.toExponential(3);
                 let vx = document.getElementById(`vx_${i}`); if(vx) vx.value = b.vx.toFixed(1);
@@ -458,21 +472,21 @@
             let dt = baseDt * timeScale; // El diferencial de tiempo por fotograma (Afectado por los controles de aceleración)
             if (dt === 0) return; // Si el simulador está en pausa, cancelamos la ejecución matemática del bucle
 
-            /* ---------------------------------------------------------------------
-             PASO 1: RESETEO DE FUERZAS NETAS (F_neta = 0)
-             Antes de recalcular las atracciones mutuas del nuevo instante, vaciamos a cero los acumuladores
-             de fuerza neta de cada astro [F_neta = F1 + F2 + ... + Fn]
-             ---------------------------------------------------------------------*/
+            // ---------------------------------------------------------------------
+            // PASO 1: RESETEO DE FUERZAS NETAS (F_neta = 0)
+            // Antes de recalcular las atracciones mutuas del nuevo instante, vaciamos a cero los acumuladores
+            // de fuerza neta de cada astro [F_neta = F1 + F2 + ... + Fn]
+            // ---------------------------------------------------------------------
             for (let i = 0; i < bodies.length; i++) {
                 bodies[i].fx = 0; bodies[i].fy = 0; bodies[i].fz = 0;
             }
 
-            /* ---------------------------------------------------------------------
-             PASO 2: CÁLCULO DE INTERACCIONES CRUZADAS POR PARES (LEY DE NEWTON)
-             Ejecutamos un algoritmo de emparejamiento doble de orden O(N²).
-             Empezamos el segundo bucle en 'j = i + 1' para aplicar el principio de Acción y Reacción (3ra ley de Newton), 
-             evitando calcular de forma redundante la atracción de i contra j y luego j contra i.
-             ---------------------------------------------------------------------*/
+            // ---------------------------------------------------------------------
+            // PASO 2: CÁLCULO DE INTERACCIONES CRUZADAS POR PARES (LEY DE NEWTON)
+            // Ejecutamos un algoritmo de emparejamiento doble de orden O(N²).
+            // Empezamos el segundo bucle en 'j = i + 1' para aplicar el principio de Acción y Reacción (3ra ley de Newton), 
+            // evitando calcular de forma redundante la atracción de i contra j y luego j contra i.
+            // ---------------------------------------------------------------------
             for (let i = 0; i < bodies.length; i++) {
                 for (let j = i + 1; j < bodies.length; j++) { 
                     
@@ -506,11 +520,11 @@
                 }
             }
 
-            /* ---------------------------------------------------------------------
-             PASO 3: INTEGRACIÓN NUMÉRICA DE EULER (ACTUALIZACIÓN DE VELOCIDAD Y POSICIÓN)
-             Con las fuerzas netas totales consolidadas para cada cuerpo por separado, despejamos aceleraciones 
-             y aplicamos los diferenciales temporales descritos analíticamente en tu guía de física.
-             ---------------------------------------------------------------------*/
+            // ---------------------------------------------------------------------
+            // PASO 3: INTEGRACIÓN NUMÉRICA DE EULER (ACTUALIZACIÓN DE VELOCIDAD Y POSICIÓN)
+            // Con las fuerzas netas totales consolidadas para cada cuerpo por separado, despejamos aceleraciones 
+            // y aplicamos los differentials temporales descritos analíticamente en tu guía de física.
+            // ---------------------------------------------------------------------
             for (let i = 0; i < bodies.length; i++) {
                 let body = bodies[i];
                 
@@ -540,8 +554,8 @@
                 body.updateTrail(); // Añade un fragmento lineal para consolidar el histórico de la elipse orbital
             }
             
-            /* DINÁMICA DE LUCES CENTRALES: Si el Sol llega a desplazarse sutilmente por el tirón gravitacional de júpiter u otros astros,
-             forzamos a que el foco luminoso puntual se mueva junto a la esfera del Sol para conservar la iluminación realista.*/
+            // DINÁMICA DE LUCES CENTRALES: Si el Sol llega a desplazarse sutilmente por el tirón gravitacional de júpiter u otros astros,
+            // forzamos a que el foco luminoso puntual se mueva junto a la esfera del Sol para conservar la iluminación realista.
             if(bodies.length > 0 && bodies[0].name === "Sol") {
                 sunLight.position.copy(bodies[0].mesh.position);
             }
@@ -556,17 +570,17 @@
             
             updatePhysics(); // Ejecuta las operaciones matemáticas del motor planetario de Newton
             
-            /* OPTIMIZACIÓN DE RENDIMIENTO DE LA UI: Reescribir textos en el árbol HTML (DOM) es una operación muy pesada. 
-             En vez de actualizar la tabla 60 veces por segundo de forma violenta, usamos un amortiguador (Muffler) 
-             para refrescar los números de la tabla únicamente una vez cada 15 fotogramas. El ojo humano no notará la diferencia.*/
+            // OPTIMIZACIÓN DE RENDIMIENTO DE LA UI: Reescribir textos en el árbol HTML (DOM) es una operación muy pesada. 
+            // En vez de actualizar la tabla 60 veces por segundo de forma violenta, usamos un amortiguador (Muffler) 
+            // para refrescar los números de la tabla únicamente una vez cada 15 fotogramas. El ojo humano no notará la diferencia.
             frameCounter++;
             if(frameCounter % 15 === 0) {
                 updateTableRealTime();
             }
 
-            /* SEGUIMIENTO DE CÁMARA INTERACTIVO: Si tenemos un planeta fijado bajo el foco, forzamos a que el centro orbital
-             // de la cámara apunte y se fije rígidamente en la coordenada de la malla virtual de dicho astro.*/
-             if(bodies[currentFocusIndex]) {
+            // SEGUIMIENTO DE CÁMARA INTERACTIVO: Si tenemos un planeta fijado bajo el foco, forzamos a que el centro orbital
+            // de la cámara apunte y se fije rígidamente en la coordenada de la malla virtual de dicho astro.
+            if(bodies[currentFocusIndex]) {
                 let targetPos = bodies[currentFocusIndex].mesh.position;
                 controls.target.copy(targetPos); // El pivote se mueve con el planeta
             }
@@ -575,16 +589,16 @@
             renderer.render(scene, camera); // Redibuja por completo la escena y toma la captura fotográfica desde el lente de la cámara
         }
 
-        /* CONTROLADOR DE REDIMENSIONAMIENTO AUTOMÁTICO (RESPONSIVE): 
-         Si el usuario maximiza el navegador o cambia el tamaño de la ventana, recalculamos las proporciones ópticas 
-         para evitar que los planetas se vean estirados como óvalos desfigurados.*/
+        // CONTROLADOR DE REDIMENSIONAMIENTO AUTOMÁTICO (RESPONSIVE): 
+        // Si el usuario maximiza el navegador o cambia el tamaño de la ventana, recalculamos las proporciones ópticas 
+        // para evitar que los planetas se vean estirados como óvalos desfigurados.
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight; // Actualiza relación de aspecto ancho/alto
             camera.updateProjectionMatrix(); // Fuerza el refresco de las matrices de proyección de la lente perspectiva
             renderer.setSize(window.innerWidth, window.innerHeight); // Redimensiona el lienzo de WebGL
         });
 
-        /* Retardo controlado para desvanecer y ocultar la cortina de carga inicial transcurridos 1.5 segundos */
+        // Retardo controlado para desvanecer y ocultar la cortina de carga inicial transcurridos 1.5 segundos
         setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 1500);
 
         // LANZAMIENTO OFICIAL DEL SIMULADOR: Dispara el bucle infinito de renderizado por primera vez
