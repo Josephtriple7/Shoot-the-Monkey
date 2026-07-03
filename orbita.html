@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laboratorio de Física - Sistema Solar</title>
+    <title>Laboratorio de Física - Ley de Gravitación Universal</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         canvas { display: block; }
@@ -14,7 +14,7 @@
         }
         
         /* Controles de Tiempo y Cámara (Arriba Derecha) */
-        #controls { top: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; width: 240px; }
+        #controls { top: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; width: 260px; }
         .btn-group { display: flex; gap: 5px; justify-content: space-between; align-items: center; }
         button { 
             background-color: #333; color: white; border: 1px solid #555; padding: 8px 10px; 
@@ -23,7 +23,7 @@
         button:hover { background-color: #555; }
         button:active { background-color: #ffcc00; color: black; border-color: #ffcc00; }
         
-        #timeDisplay { text-align: center; font-size: 18px; font-weight: bold; color: #ffcc00; margin-bottom: 5px; }
+        #timeDisplay { text-align: center; font-size: 16px; font-weight: bold; color: #ffcc00; margin-bottom: 5px; }
         #focusDisplay { flex-grow: 2; text-align: center; font-weight: bold; font-size: 16px; color: #4b90ff; }
         .section-title { text-align: center; font-size: 12px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-top: 10px; border-bottom: 1px solid #444; padding-bottom: 5px; }
         
@@ -37,15 +37,15 @@
         .header-buttons { display: flex; gap: 10px; }
         .table-container { overflow-y: auto; flex-grow: 1; border: 1px solid #444; border-radius: 5px; }
         
-        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; }
+        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 12px; }
         th { background: #222; position: sticky; top: 0; padding: 8px; border-bottom: 2px solid #555; color: #ffcc00; }
         td { padding: 5px; border-bottom: 1px solid #333; }
         tr:hover { background: #1a1a1a; }
         
         /* Inputs dentro de la tabla */
         input[type="number"] {
-            width: 70px; background: #000; color: white; border: 1px solid #555; 
-            border-radius: 3px; padding: 4px; text-align: center; font-family: monospace;
+            width: 90px; background: #000; color: white; border: 1px solid #555; 
+            border-radius: 3px; padding: 4px; text-align: center; font-family: monospace; font-size: 11px;
         }
         input[type="number"]:focus { outline: none; border-color: #ffcc00; background: #222; }
         .btn-delete { background: #aa0000; padding: 4px 8px; }
@@ -58,20 +58,20 @@
 </head>
 <body>
 
-    <div id="loading">Cargando texturas del Sistema Solar...</div>
+    <div id="loading">Cargando simulador físico...</div>
 
     <div id="controls" class="panel">
-        <div id="timeDisplay">Velocidad: 1.0x</div>
+        <div id="timeDisplay">Paso Temporal (dt): 86400s/frame</div>
         <div class="btn-group">
-            <button onclick="changeTime(-0.5)">⏪</button>
+            <button onclick="changeTime(0.5)">⏪ Frenar</button>
             <button onclick="pauseTime()">⏸ Pausa</button>
-            <button onclick="changeTime(0.5)">⏩</button>
+            <button onclick="changeTime(2.0)">Acelerar ⏩</button>
         </div>
         
-        <div class="section-title">Parámetro Global</div>
+        <div class="section-title">Constante Gravitacional</div>
         <div style="display:flex; justify-content:space-between; align-items:center; font-size:14px;">
-            <span>Gravedad (G):</span>
-            <input type="number" id="globalG" value="0.5" step="0.1" style="width: 60px;" onchange="updateGlobalG()">
+            <span>G (N·m²/kg²):</span>
+            <input type="text" id="globalG" value="6.67e-11" style="width: 80px; background:#000; color:#fff; border:1px solid #555; text-align:center;" onchange="updateGlobalG()">
         </div>
 
         <div class="section-title">Cámara y Órbitas</div>
@@ -85,7 +85,7 @@
 
     <div id="dataPanel" class="panel">
         <div class="data-header">
-            <h3>Laboratorio: Datos Dinámicos</h3>
+            <h3>Simulación Real: Ley de Gravitación Universal ($F = G \frac{m_1 m_2}{r^2}$)</h3>
             <div class="header-buttons">
                 <button onclick="resetSystem()" style="background: #a05a00; border-color: #ff8c00;">🔄 Restablecer Sistema</button>
                 <button onclick="addCustomBody()" style="background: #2b5c2b; border-color: #4CAF50;">+ Añadir Cuerpo Celeste</button>
@@ -96,16 +96,16 @@
                 <thead>
                     <tr>
                         <th>Nombre</th>
-                        <th>Masa (m)</th>
-                        <th>Posición X</th>
-                        <th>Posición Z</th>
-                        <th>Velocidad X</th>
-                        <th>Velocidad Z</th>
+                        <th>Masa (kg)</th>
+                        <th>Posición X (m)</th>
+                        <th>Posición Z (m)</th>
+                        <th>Velocidad X (m/s)</th>
+                        <th>Velocidad Z (m/s)</th>
                         <th>Eliminar</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
-                    </tbody>
+                </tbody>
             </table>
         </div>
     </div>
@@ -113,7 +113,7 @@
     <script>
         // --- 1. CONFIGURACIÓN BÁSICA DE THREE.JS ---
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 20000);
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 50000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
@@ -121,14 +121,15 @@
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true; controls.dampingFactor = 0.05;
 
-        scene.add(new THREE.AmbientLight(0x222222));
-        const sunLight = new THREE.PointLight(0xffffff, 2.5, 5000);
+        scene.add(new THREE.AmbientLight(0x333333));
+        const sunLight = new THREE.PointLight(0xffffff, 3, 10000);
         scene.add(sunLight);
         
+        // Fondo estelar
         const starGeo = new THREE.BufferGeometry();
         const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.5 });
         const starVertices = [];
-        for (let i = 0; i < 4000; i++) starVertices.push((Math.random() - 0.5) * 8000, (Math.random() - 0.5) * 8000, (Math.random() - 0.5) * 8000);
+        for (let i = 0; i < 2000; i++) starVertices.push((Math.random() - 0.5) * 20000, (Math.random() - 0.5) * 20000, (Math.random() - 0.5) * 20000);
         starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
         scene.add(new THREE.Points(starGeo, starMat));
 
@@ -137,134 +138,120 @@
         let texturesLoaded = 0;
         function checkLoad() {
             texturesLoaded++;
-            if(texturesLoaded >= 9) document.getElementById('loading').style.display = 'none';
+            if(texturesLoaded >= 3) document.getElementById('loading').style.display = 'none';
         }
 
-        // --- 2. VARIABLES DEL MOTOR FÍSICO ---
-        let G = 0.5; 
-        const baseDt = 0.8;
+        // --- 2. FACTORES DE ESCALA (MÉTRICO REAL -> PANTALLA 3D) ---
+        // 1 Unidad en Three.js equivaldrá a 1,000,000,000 metros (1e9 m) en el espacio real.
+        const VISUAL_SCALE = 1e9; 
+        let G = 6.67e-11; 
+        const baseDt = 86400 / 2; // Medio día por frame por defecto
         let timeScale = 1.0; 
         let showTrails = true;
         let currentFocusIndex = 0;
 
         // --- 3. CLASE CUERPO CELESTE ---
         class Body {
-            constructor(name, x, z, mass, radius, textureUrl, hasRings = false, customColor = null) {
+            constructor(name, xMetros, zMetros, vx, vz, mass, visualRadius, textureUrl, customColor = null) {
                 this.name = name; 
                 this.mass = mass;
-                this.radius = radius;
+                this.radius = visualRadius; // Radio meramente representativo para que se vea
                 
-                this.vx = 0; this.vy = 0;
-                let dist = Math.sqrt(x*x + z*z);
-                this.vz = dist > 0 ? Math.sqrt(G * 10000 / dist) : 0;
+                // Vectores de Estado Físicos Reales (Métricas del documento)
+                this.x = xMetros;
+                this.y = 0;
+                this.z = zMetros;
+                this.vx = vx;
+                this.vy = 0;
+                this.vz = vz;
                 
                 this.ax = 0; this.ay = 0; this.az = 0;
                 this.fx = 0; this.fy = 0; this.fz = 0;
 
-                const geometry = new THREE.SphereGeometry(radius, 32, 32);
+                const geometry = new THREE.SphereGeometry(visualRadius, 32, 32);
                 let material;
                 
                 if (textureUrl) {
                     const texture = textureLoader.load(baseUrl + textureUrl, checkLoad);
                     material = name === "Sol" ? new THREE.MeshBasicMaterial({ map: texture }) : new THREE.MeshStandardMaterial({ map: texture, roughness: 0.5 });
                 } else {
-                    material = new THREE.MeshStandardMaterial({ color: customColor, roughness: 0.5 });
+                    material = new THREE.MeshStandardMaterial({ color: customColor || 0xffffff, roughness: 0.5 });
                     checkLoad(); 
                 }
 
                 this.mesh = new THREE.Mesh(geometry, material);
-                this.mesh.position.set(x, 0, z);
+                // Posicionamos en el entorno visual escalando las unidades
+                this.mesh.position.set(this.x / VISUAL_SCALE, this.y / VISUAL_SCALE, this.z / VISUAL_SCALE);
                 scene.add(this.mesh);
 
-                if (hasRings) {
-                    const ringGeo = new THREE.RingGeometry(radius + 5, radius + 20, 64);
-                    const ringTex = textureLoader.load(baseUrl + 'saturnringcolor.jpg');
-                    const ringMat = new THREE.MeshStandardMaterial({ map: ringTex, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
-                    this.ringMesh = new THREE.Mesh(ringGeo, ringMat);
-                    this.ringMesh.rotation.x = Math.PI / 2 + 0.3;
-                    this.mesh.add(this.ringMesh);
-                }
-
                 this.trailPositions = [];
-                this.trail = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.3 }));
+                this.trail = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: customColor || 0x888888, transparent: true, opacity: 0.4 }));
                 scene.add(this.trail);
             }
 
-            updateTrail(timeScale) {
+            updateVisuals() {
+                this.mesh.position.set(this.x / VISUAL_SCALE, this.y / VISUAL_SCALE, this.z / VISUAL_SCALE);
+            }
+
+            updateTrail() {
                 if (!showTrails) return;
-                if (Math.abs(timeScale) > 0.01 && Math.random() < 0.2) {
+                if (Math.abs(timeScale) > 0.01 && Math.random() < 0.3) {
                     this.trailPositions.push(this.mesh.position.clone());
-                    if (this.trailPositions.length > 350) this.trailPositions.shift();
+                    if (this.trailPositions.length > 500) this.trailPositions.shift();
                     this.trail.geometry.setFromPoints(this.trailPositions);
                 }
             }
         }
 
-        // --- 4. SISTEMA DE REINICIO Y CREACIÓN INICIAL ---
+        // --- 4. SISTEMA DE REINICIO CON VALORES DEL DOCUMENTO ---
         const bodies = [];
 
-        // Función para poblar el sistema solar por defecto
         function buildDefaultSolarSystem() {
-            // Borramos los objetos 3D de la escena antes de vaciar la lista (por si acaso)
             for (let i = 0; i < bodies.length; i++) {
                 scene.remove(bodies[i].mesh);
-                if (bodies[i].ringMesh) scene.remove(bodies[i].ringMesh);
                 scene.remove(bodies[i].trail);
             }
-            
-            // Vaciamos el arreglo
             bodies.length = 0;
 
-            // Creamos los cuerpos originales nuevamente
-            bodies.push(new Body("Sol", 0, 0, 10000, 60, "sunmap.jpg"));
-            bodies.push(new Body("Mercurio", 120, 0, 0.2, 4, "mercurymap.jpg"));
-            bodies.push(new Body("Venus", 180, 0, 0.8, 8, "venusmap.jpg"));
-            bodies.push(new Body("Tierra", 260, 0, 1.0, 9, "earthmap1k.jpg"));
-            bodies.push(new Body("Marte", 340, 0, 0.4, 6, "marsmap1k.jpg"));
-            bodies.push(new Body("Júpiter", 550, 0, 80, 25, "jupitermap.jpg"));
-            bodies.push(new Body("Saturno", 800, 0, 50, 20, "saturnmap.jpg", true));
-            bodies.push(new Body("Urano", 1050, 0, 20, 14, "uranusmap.jpg"));
-            bodies.push(new Body("Neptuno", 1300, 0, 22, 13, "neptunemap.jpg"));
+            // Datos exactos de la guía:
+            // Sol: masa = 1.989 x 10^30 kg
+            bodies.push(new Body("Sol", 0, 0, 0, 0, 1.989e30, 25, "sunmap.jpg", 0xffcc00));
+            
+            // Tierra: r = 150 x 10^9 m, v = 29885 m/s, masa = 5.972 x 10^24 kg
+            bodies.push(new Body("Tierra", 150e9, 0, 0, 29885, 5.972e24, 10, "earthmap1k.jpg", 0x4b90ff));
 
-            // Reiniciamos cámara y enfoque
+            // Luna (Opcional del documento: masa ~7.34e22, a 384,400,000m de la Tierra, v_orbital_relativa ~1022 m/s)
+            bodies.push(new Body("Luna", 150e9 + 0.3844e9, 0, 0, 29885 + 1022, 7.342e22, 3, null, 0xaaaaaa));
+
             currentFocusIndex = 0;
-            camera.position.set(0, 400, 800);
+            camera.position.set(0, 200, 400);
+            controls.target.set(0,0,0);
         }
 
-        // Construimos por primera vez
         buildDefaultSolarSystem();
 
-        // LÓGICA DEL BOTÓN "RESTABLECER SISTEMA"
         window.resetSystem = () => {
-            if(confirm("¿Seguro que deseas restablecer el simulador? Se borrarán tus ejercicios y los planetas volverán a su estado original.")) {
-                // 1. Restaurar valores globales de física y tiempo
-                G = 0.5;
-                document.getElementById('globalG').value = G;
+            if(confirm("¿Restablecer a los valores por defecto del documento de Física?")) {
+                G = 6.67e-11;
+                document.getElementById('globalG').value = "6.67e-11";
                 timeScale = 1.0;
-                timeDisplay.innerText = `Velocidad: 1.0x`;
-                
-                // 2. Volver a armar el sistema solar original
+                document.getElementById('timeDisplay').innerText = `Paso Temporal (dt): ${(baseDt * timeScale).toFixed(0)}s/frame`;
                 buildDefaultSolarSystem();
-                
-                // 3. Actualizar la tabla de datos
                 renderTable();
             }
         };
 
-        // --- 5. LÓGICA DE INTERFAZ Y CRUD ---
-        
+        // --- 5. LÓGICA DE INTERFAZ Y EDICIÓN DE CÉLULAS REALES ---
         const timeDisplay = document.getElementById('timeDisplay');
-        window.changeTime = (amount) => { timeScale += amount; timeDisplay.innerText = `Velocidad: ${timeScale.toFixed(1)}x`; };
-        window.pauseTime = () => { timeScale = 0; timeDisplay.innerText = `Velocidad: 0.0x`; };
+        window.changeTime = (factor) => { timeScale *= factor; timeDisplay.innerText = `Paso Temporal (dt): ${(baseDt * timeScale).toFixed(0)}s/frame`; };
+        window.pauseTime = () => { timeScale = 0; timeDisplay.innerText = `Simulación Pausada`; };
         window.toggleTrails = () => { showTrails = !showTrails; document.getElementById('btnTrails').innerText = showTrails ? "Ocultar Órbitas" : "Mostrar Órbitas"; for (let b of bodies) b.trail.visible = showTrails; };
-        window.updateGlobalG = () => { G = parseFloat(document.getElementById('globalG').value) || 0; };
+        window.updateGlobalG = () => { G = parseFloat(document.getElementById('globalG').value) || 6.67e-11; };
 
         const focusDisplay = document.getElementById('focusDisplay');
         window.changeFocus = (dir) => {
             if (bodies.length === 0) return;
-            currentFocusIndex += dir;
-            if (currentFocusIndex < 0) currentFocusIndex = bodies.length - 1;
-            if (currentFocusIndex >= bodies.length) currentFocusIndex = 0;
+            currentFocusIndex = (currentFocusIndex + dir + bodies.length) % bodies.length;
             focusDisplay.innerText = bodies[currentFocusIndex].name;
         };
 
@@ -273,64 +260,57 @@
             bodies.forEach((b, i) => {
                 html += `<tr>
                     <td><strong>${b.name}</strong></td>
-                    <td><input type="number" id="m_${i}" value="${b.mass.toFixed(1)}" onchange="updateBodyData(${i})" step="0.1"></td>
-                    <td><input type="number" id="px_${i}" value="${b.mesh.position.x.toFixed(1)}" onchange="updateBodyData(${i})"></td>
-                    <td><input type="number" id="pz_${i}" value="${b.mesh.position.z.toFixed(1)}" onchange="updateBodyData(${i})"></td>
-                    <td><input type="number" id="vx_${i}" value="${b.vx.toFixed(2)}" onchange="updateBodyData(${i})" step="0.1"></td>
-                    <td><input type="number" id="vz_${i}" value="${b.vz.toFixed(2)}" onchange="updateBodyData(${i})" step="0.1"></td>
+                    <td><input type="number" id="m_${i}" value="${b.mass.toExponential(3)}" onchange="updateBodyData(${i})"></td>
+                    <td><input type="number" id="px_${i}" value="${b.x.toExponential(3)}" onchange="updateBodyData(${i})"></td>
+                    <td><input type="number" id="pz_${i}" value="${b.z.toExponential(3)}" onchange="updateBodyData(${i})"></td>
+                    <td><input type="number" id="vx_${i}" value="${b.vx.toFixed(1)}" onchange="updateBodyData(${i})"></td>
+                    <td><input type="number" id="vz_${i}" value="${b.vz.toFixed(1)}" onchange="updateBodyData(${i})"></td>
                     <td><button class="btn-delete" onclick="deleteBody(${i})">❌</button></td>
                 </tr>`;
             });
             document.getElementById('tableBody').innerHTML = html;
-            
-            if(bodies.length > 0) {
-                if(currentFocusIndex >= bodies.length) currentFocusIndex = 0;
-                focusDisplay.innerText = bodies[currentFocusIndex].name;
-            } else {
-                focusDisplay.innerText = "Ninguno";
-            }
+            focusDisplay.innerText = bodies[currentFocusIndex] ? bodies[currentFocusIndex].name : "Ninguno";
         }
 
         function updateTableRealTime() {
-            if (!document.hasFocus() || document.activeElement.tagName !== 'INPUT') {
-                bodies.forEach((b, i) => {
-                    let px = document.getElementById(`px_${i}`); if(px) px.value = b.mesh.position.x.toFixed(1);
-                    let pz = document.getElementById(`pz_${i}`); if(pz) pz.value = b.mesh.position.z.toFixed(1);
-                    let vx = document.getElementById(`vx_${i}`); if(vx) vx.value = b.vx.toFixed(2);
-                    let vz = document.getElementById(`vz_${i}`); if(vz) vz.value = b.vz.toFixed(2);
-                });
-            }
+            if (!document.hasFocus() || document.activeElement.tagName === 'INPUT') return;
+            bodies.forEach((b, i) => {
+                let px = document.getElementById(`px_${i}`); if(px) px.value = b.x.toExponential(3);
+                let pz = document.getElementById(`pz_${i}`); if(pz) pz.value = b.z.toExponential(3);
+                let vx = document.getElementById(`vx_${i}`); if(vx) vx.value = b.vx.toFixed(1);
+                let vz = document.getElementById(`vz_${i}`); if(vz) vz.value = b.vz.toFixed(1);
+            });
         }
 
         window.updateBodyData = (i) => {
             let b = bodies[i];
             b.mass = parseFloat(document.getElementById(`m_${i}`).value) || 0;
-            b.mesh.position.x = parseFloat(document.getElementById(`px_${i}`).value) || 0;
-            b.mesh.position.z = parseFloat(document.getElementById(`pz_${i}`).value) || 0;
+            b.x = parseFloat(document.getElementById(`px_${i}`).value) || 0;
+            b.z = parseFloat(document.getElementById(`pz_${i}`).value) || 0;
             b.vx = parseFloat(document.getElementById(`vx_${i}`).value) || 0;
             b.vz = parseFloat(document.getElementById(`vz_${i}`).value) || 0;
             
             b.trailPositions = [];
             b.trail.geometry.setFromPoints([]);
+            b.updateVisuals();
         };
 
         window.addCustomBody = () => {
-            let name = prompt("Nombre del nuevo planeta/cuerpo:", "Asteroide") || "Cuerpo X";
-            let mass = parseFloat(prompt("Masa del cuerpo:", "1")) || 1;
-            let posX = parseFloat(prompt("Posición en X inicial:", "400")) || 400;
-            let color = Math.random() * 0xffffff;
+            let name = prompt("Nombre del cuerpo:", "Marte") || "Planeta X";
+            let mass = parseFloat(prompt("Masa (en kg, ej. Marte es 6.39e23):", "6.39e23")) || 1e24;
+            let posX = parseFloat(prompt("Distancia al Sol en metros X (ej. 228e9):", "228e9")) || 200e9;
+            let velZ = parseFloat(prompt("Velocidad Orbital tangencial en m/s (ej. 24000):", "24000")) || 24000;
             
-            let b = new Body(name, posX, 0, mass, 10, null, false, color);
+            let color = Math.random() * 0xffffff;
+            let b = new Body(name, posX, 0, 0, velZ, mass, 7, null, color);
             bodies.push(b);
             renderTable();
         };
 
         window.deleteBody = (i) => {
-            if(confirm(`¿Seguro que deseas eliminar a ${bodies[i].name}?`)) {
-                let b = bodies[i];
-                scene.remove(b.mesh);
-                if (b.ringMesh) scene.remove(b.ringMesh);
-                scene.remove(b.trail);
+            if(confirm(`¿Eliminar a ${bodies[i].name}?`)) {
+                scene.remove(bodies[i].mesh);
+                scene.remove(bodies[i].trail);
                 bodies.splice(i, 1);
                 renderTable();
             }
@@ -338,38 +318,45 @@
 
         renderTable();
 
-        // --- 6. MOTOR FÍSICO Y RENDERIZADO ---
+        // --- 6. MOTOR FÍSICO VECTORIAL (Leyes de Newton del documento) ---
         let frameCounter = 0;
 
         function updatePhysics() {
             let dt = baseDt * timeScale;
-            if (Math.abs(dt) < 0.001) return;
+            if (dt === 0) return;
 
+            // 1. Resetear fuerzas (Fneta = 0)
             for (let i = 0; i < bodies.length; i++) {
                 bodies[i].fx = 0; bodies[i].fy = 0; bodies[i].fz = 0;
             }
 
+            // 2. Calcular gravedad mutua: F = G * (m1 * m2) / r²
             for (let i = 0; i < bodies.length; i++) {
                 for (let j = i + 1; j < bodies.length; j++) { 
-                    let dx = bodies[j].mesh.position.x - bodies[i].mesh.position.x;
-                    let dy = bodies[j].mesh.position.y - bodies[i].mesh.position.y;
-                    let dz = bodies[j].mesh.position.z - bodies[i].mesh.position.z;
+                    let dx = bodies[j].x - bodies[i].x;
+                    let dy = bodies[j].y - bodies[i].y;
+                    let dz = bodies[j].z - bodies[i].z;
                     
                     let distSq = dx*dx + dy*dy + dz*dz;
                     let dist = Math.sqrt(distSq);
                     
-                    if (dist > (bodies[i].radius + bodies[j].radius)) {
+                    if (dist > 0) {
+                        // Ley de gravitación universal
                         let forceMagnitude = (G * bodies[i].mass * bodies[j].mass) / distSq;
+                        
+                        // Componentes vectoriales de la fuerza dirección unitaria
                         let fx = forceMagnitude * (dx / dist);
                         let fy = forceMagnitude * (dy / dist);
                         let fz = forceMagnitude * (dz / dist);
 
+                        // Principio de Acción y Reacción (Fneta = F1 + F2...)
                         bodies[i].fx += fx; bodies[i].fy += fy; bodies[i].fz += fz;
                         bodies[j].fx -= fx; bodies[j].fy -= fy; bodies[j].fz -= fz;
                     }
                 }
             }
 
+            // 3. Integración de Newton: a = F / m -> vf = v0 + a*dt -> rf = r0 + v*dt
             for (let i = 0; i < bodies.length; i++) {
                 let body = bodies[i];
                 if (body.mass > 0) {
@@ -378,16 +365,20 @@
                     body.az = body.fz / body.mass;
                 }
 
+                // Cambios en velocidad
                 body.vx += body.ax * dt; 
                 body.vy += body.ay * dt; 
                 body.vz += body.az * dt;
 
-                body.mesh.position.x += body.vx * dt;
-                body.mesh.position.y += body.vy * dt;
-                body.mesh.position.z += body.vz * dt;
+                // Cambios en posición
+                body.x += body.vx * dt;
+                body.y += body.vy * dt;
+                body.z += body.vz * dt;
                 
-                body.mesh.rotation.y += 0.01 * dt; 
-                body.updateTrail(timeScale);
+                // Actualizar la malla 3D escalada y su estela
+                body.updateVisuals();
+                body.mesh.rotation.y += 0.005; 
+                body.updateTrail();
             }
             
             if(bodies.length > 0 && bodies[0].name === "Sol") {
@@ -400,11 +391,11 @@
             updatePhysics();
             
             frameCounter++;
-            if(frameCounter % 10 === 0 && Math.abs(timeScale) > 0) {
+            if(frameCounter % 15 === 0) {
                 updateTableRealTime();
             }
 
-            if(bodies.length > 0) {
+            if(bodies[currentFocusIndex]) {
                 let targetPos = bodies[currentFocusIndex].mesh.position;
                 controls.target.copy(targetPos);
             }
@@ -416,9 +407,10 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            document.getElementById('dataPanel').style.height = (window.innerHeight * 0.3) + "px";
         });
-        document.getElementById('dataPanel').style.height = (window.innerHeight * 0.3) + "px";
+
+        // Asegurar que el cargador termine rápido si no hay texturas externas listadas
+        setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 1500);
 
         animate();
     </script>
