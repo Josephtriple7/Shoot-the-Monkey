@@ -3,24 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema Solar 3D - Leyes de Newton Explicadas</title>
+    <title>Laboratorio de Física - Sistema Solar</title>
     <style>
-        /* (El CSS se mantiene igual, controla los colores y los botones) */
         body { margin: 0; overflow: hidden; background-color: #000; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         canvas { display: block; }
-        .panel { position: absolute; background: rgba(10, 10, 15, 0.85); padding: 15px; border-radius: 10px; border: 1px solid #333; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
-        #info { top: 20px; left: 20px; pointer-events: none; }
-        #info h3 { margin: 0 0 5px 0; color: #ffcc00; }
-        #info p { margin: 0; font-size: 14px; color: #ccc; }
+        
+        .panel { 
+            position: absolute; background: rgba(10, 10, 15, 0.9); padding: 15px; 
+            border-radius: 10px; border: 1px solid #333; box-shadow: 0 4px 6px rgba(0,0,0,0.5); 
+        }
+        
+        /* Controles de Tiempo y Cámara (Arriba Derecha) */
         #controls { top: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; width: 240px; }
         .btn-group { display: flex; gap: 5px; justify-content: space-between; align-items: center; }
-        button { background-color: #333; color: white; border: 1px solid #555; padding: 8px 10px; border-radius: 5px; cursor: pointer; flex-grow: 1; transition: all 0.2s; font-size: 14px; }
+        button { 
+            background-color: #333; color: white; border: 1px solid #555; padding: 8px 10px; 
+            border-radius: 5px; cursor: pointer; flex-grow: 1; transition: all 0.2s; font-size: 14px; 
+        }
         button:hover { background-color: #555; }
         button:active { background-color: #ffcc00; color: black; border-color: #ffcc00; }
-        .section-title { text-align: center; font-size: 12px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-top: 10px; border-bottom: 1px solid #444; padding-bottom: 5px; }
+        
         #timeDisplay { text-align: center; font-size: 18px; font-weight: bold; color: #ffcc00; margin-bottom: 5px; }
         #focusDisplay { flex-grow: 2; text-align: center; font-weight: bold; font-size: 16px; color: #4b90ff; }
-        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; color: white; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; }
+        .section-title { text-align: center; font-size: 12px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-top: 10px; border-bottom: 1px solid #444; padding-bottom: 5px; }
+        
+        /* Panel de Datos y Ejercicios (Abajo) */
+        #dataPanel {
+            bottom: 20px; left: 20px; right: 20px; height: 250px; 
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .data-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .data-header h3 { margin: 0; color: #4b90ff; }
+        .header-buttons { display: flex; gap: 10px; }
+        .table-container { overflow-y: auto; flex-grow: 1; border: 1px solid #444; border-radius: 5px; }
+        
+        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; }
+        th { background: #222; position: sticky; top: 0; padding: 8px; border-bottom: 2px solid #555; color: #ffcc00; }
+        td { padding: 5px; border-bottom: 1px solid #333; }
+        tr:hover { background: #1a1a1a; }
+        
+        /* Inputs dentro de la tabla */
+        input[type="number"] {
+            width: 70px; background: #000; color: white; border: 1px solid #555; 
+            border-radius: 3px; padding: 4px; text-align: center; font-family: monospace;
+        }
+        input[type="number"]:focus { outline: none; border-color: #ffcc00; background: #222; }
+        .btn-delete { background: #aa0000; padding: 4px 8px; }
+        .btn-delete:hover { background: #ff0000; }
+
+        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; color: white; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; z-index: 1000; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -29,143 +60,122 @@
 
     <div id="loading">Cargando texturas del Sistema Solar...</div>
 
-    <div id="info" class="panel">
-        <h3>Sistema Solar Físico 3D</h3>
-        <p>Arrastra para rotar | Rueda para Zoom</p>
-    </div>
-
     <div id="controls" class="panel">
         <div id="timeDisplay">Velocidad: 1.0x</div>
         <div class="btn-group">
-            <button onclick="changeTime(-0.5)">⏪ Atrás</button>
+            <button onclick="changeTime(-0.5)">⏪</button>
             <button onclick="pauseTime()">⏸ Pausa</button>
-            <button onclick="changeTime(0.5)">⏩ Adelante</button>
+            <button onclick="changeTime(0.5)">⏩</button>
         </div>
-        <button onclick="resetTime()">Restablecer Tiempo (1x)</button>
-        <div class="section-title">Visualización</div>
-        <button onclick="toggleTrails()" id="btnTrails">Ocultar Órbitas</button>
-        <div class="section-title">Enfoque de Cámara</div>
-        <div class="btn-group">
+        
+        <div class="section-title">Parámetro Global</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:14px;">
+            <span>Gravedad (G):</span>
+            <input type="number" id="globalG" value="0.5" step="0.1" style="width: 60px;" onchange="updateGlobalG()">
+        </div>
+
+        <div class="section-title">Cámara y Órbitas</div>
+        <div class="btn-group" style="margin-bottom: 10px;">
             <button onclick="changeFocus(-1)">⬅️</button>
             <div id="focusDisplay">Sol</div>
             <button onclick="changeFocus(1)">➡️</button>
         </div>
+        <button onclick="toggleTrails()" id="btnTrails">Ocultar Órbitas</button>
+    </div>
+
+    <div id="dataPanel" class="panel">
+        <div class="data-header">
+            <h3>Laboratorio: Datos Dinámicos</h3>
+            <div class="header-buttons">
+                <button onclick="resetSystem()" style="background: #a05a00; border-color: #ff8c00;">🔄 Restablecer Sistema</button>
+                <button onclick="addCustomBody()" style="background: #2b5c2b; border-color: #4CAF50;">+ Añadir Cuerpo Celeste</button>
+            </div>
+        </div>
+        <div class="table-container">
+            <table id="bodiesTable">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Masa (m)</th>
+                        <th>Posición X</th>
+                        <th>Posición Z</th>
+                        <th>Velocidad X</th>
+                        <th>Velocidad Z</th>
+                        <th>Eliminar</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    </tbody>
+            </table>
+        </div>
     </div>
 
     <script>
-        // ==========================================
-        // 1. PREPARANDO EL ESCENARIO (EL UNIVERSO)
-        // ==========================================
-        
-        // Creamos la "escena" (el espacio vacío donde pondremos todo)
+        // --- 1. CONFIGURACIÓN BÁSICA DE THREE.JS ---
         const scene = new THREE.Scene();
-        
-        // Creamos la "cámara" (nuestros ojos en este mundo 3D)
         const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 20000);
-        
-        // Creamos el "renderizador" (el motor que pinta la escena en la pantalla)
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
-
-        // Controles para que podamos mover la cámara con el ratón
+        
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true; // Hace que el movimiento sea suave
-        controls.dampingFactor = 0.05;
+        controls.enableDamping = true; controls.dampingFactor = 0.05;
 
-        // ==========================================
-        // 2. LUCES Y DECORACIÓN
-        // ==========================================
-        
-        // Luz ambiental suave para no estar en oscuridad total
-        scene.add(new THREE.AmbientLight(0x111111));
-        
-        // La luz del Sol. Es una bombilla muy potente en el centro
+        scene.add(new THREE.AmbientLight(0x222222));
         const sunLight = new THREE.PointLight(0xffffff, 2.5, 5000);
         scene.add(sunLight);
-
-        // Dibujamos 4000 puntitos blancos al azar para simular las estrellas de fondo
+        
         const starGeo = new THREE.BufferGeometry();
         const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.5 });
         const starVertices = [];
-        for (let i = 0; i < 4000; i++) {
-            starVertices.push((Math.random() - 0.5) * 8000, (Math.random() - 0.5) * 8000, (Math.random() - 0.5) * 8000);
-        }
+        for (let i = 0; i < 4000; i++) starVertices.push((Math.random() - 0.5) * 8000, (Math.random() - 0.5) * 8000, (Math.random() - 0.5) * 8000);
         starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
         scene.add(new THREE.Points(starGeo, starMat));
 
-        // ==========================================
-        // 3. CARGADOR DE IMÁGENES (Piel de los planetas)
-        // ==========================================
         const textureLoader = new THREE.TextureLoader();
         const baseUrl = "https://raw.githubusercontent.com/jeromeetienne/threex.planets/master/images/";
         let texturesLoaded = 0;
-        
-        // Cuando cargan las 9 texturas, ocultamos el cartel de "Cargando..."
         function checkLoad() {
             texturesLoaded++;
             if(texturesLoaded >= 9) document.getElementById('loading').style.display = 'none';
         }
 
-        // ==========================================
-        // 4. REGLAS DEL UNIVERSO (Variables)
-        // ==========================================
-        const G = 0.5; // La "fuerza" de la gravedad. Si la subimos, los planetas se atraen más fuerte.
-        const baseDt = 0.8; // El paso del tiempo base en cada fotograma.
-        let timeScale = 1.0; // Multiplicador de tiempo (para cámara rápida o cámara lenta)
-        let showTrails = true; // ¿Mostramos la línea de la órbita?
-        let currentFocusIndex = 0; // A qué planeta estamos mirando (0 es el Sol)
+        // --- 2. VARIABLES DEL MOTOR FÍSICO ---
+        let G = 0.5; 
+        const baseDt = 0.8;
+        let timeScale = 1.0; 
+        let showTrails = true;
+        let currentFocusIndex = 0;
 
-        // Funciones de los botones de la pantalla (UI)
-        const timeDisplay = document.getElementById('timeDisplay');
-        window.changeTime = (amount) => { timeScale += amount; timeDisplay.innerText = `Velocidad: ${timeScale.toFixed(1)}x`; };
-        window.pauseTime = () => { timeScale = 0; timeDisplay.innerText = `Velocidad: 0.0x`; };
-        window.resetTime = () => { timeScale = 1; timeDisplay.innerText = `Velocidad: 1.0x`; };
-        window.toggleTrails = () => { showTrails = !showTrails; document.getElementById('btnTrails').innerText = showTrails ? "Ocultar Órbitas" : "Mostrar Órbitas"; for (let b of bodies) if (b.trail) b.trail.visible = showTrails; };
-        
-        // Función para cambiar de planeta con las flechas
-        const focusDisplay = document.getElementById('focusDisplay');
-        window.changeFocus = (dir) => {
-            currentFocusIndex += dir;
-            if (currentFocusIndex < 0) currentFocusIndex = bodies.length - 1;
-            if (currentFocusIndex >= bodies.length) currentFocusIndex = 0;
-            const target = bodies[currentFocusIndex];
-            focusDisplay.innerText = target.name;
-            // Teletransportar la cámara cerca del nuevo planeta
-            let offset = target.name === "Sol" ? 800 : target.radius * 5; 
-            camera.position.set(target.mesh.position.x + offset, target.mesh.position.y + (offset * 0.5), target.mesh.position.z + offset);
-        };
-
-        // ==========================================
-        // 5. LA FÁBRICA DE PLANETAS (Clase Body)
-        // ==========================================
-        // Esta es la "plantilla" con la que crearemos cada planeta y el Sol
+        // --- 3. CLASE CUERPO CELESTE ---
         class Body {
-            constructor(name, x, z, mass, radius, textureUrl, hasRings = false) {
+            constructor(name, x, z, mass, radius, textureUrl, hasRings = false, customColor = null) {
                 this.name = name; 
-                this.mass = mass; // Qué tan pesado es. Vital para la gravedad.
-                this.radius = radius; // Qué tan grande se ve.
+                this.mass = mass;
+                this.radius = radius;
                 
-                // Velocidad inicial (vx, vy, vz)
                 this.vx = 0; this.vy = 0;
                 let dist = Math.sqrt(x*x + z*z);
-                // Le damos un empujón lateral inicial (vz) para que empiece a girar 
-                // en lugar de caer directamente hacia el Sol en línea recta.
                 this.vz = dist > 0 ? Math.sqrt(G * 10000 / dist) : 0;
                 
-                // Aceleración (ax, ay, az) y Fuerza (fx, fy, fz). Empiezan en cero.
                 this.ax = 0; this.ay = 0; this.az = 0;
                 this.fx = 0; this.fy = 0; this.fz = 0;
 
-                // Creamos la bola 3D y le pegamos la imagen del planeta
-                const texture = textureLoader.load(baseUrl + textureUrl, checkLoad);
                 const geometry = new THREE.SphereGeometry(radius, 32, 32);
-                const material = name === "Sol" ? new THREE.MeshBasicMaterial({ map: texture }) : new THREE.MeshStandardMaterial({ map: texture, roughness: 0.5 });
+                let material;
+                
+                if (textureUrl) {
+                    const texture = textureLoader.load(baseUrl + textureUrl, checkLoad);
+                    material = name === "Sol" ? new THREE.MeshBasicMaterial({ map: texture }) : new THREE.MeshStandardMaterial({ map: texture, roughness: 0.5 });
+                } else {
+                    material = new THREE.MeshStandardMaterial({ color: customColor, roughness: 0.5 });
+                    checkLoad(); 
+                }
+
                 this.mesh = new THREE.Mesh(geometry, material);
-                this.mesh.position.set(x, 0, z); // Lo colocamos en su posición inicial
+                this.mesh.position.set(x, 0, z);
                 scene.add(this.mesh);
 
-                // Si es Saturno, le ponemos sus anillos
                 if (hasRings) {
                     const ringGeo = new THREE.RingGeometry(radius + 5, radius + 20, 64);
                     const ringTex = textureLoader.load(baseUrl + 'saturnringcolor.jpg');
@@ -175,158 +185,241 @@
                     this.mesh.add(this.ringMesh);
                 }
 
-                // Preparamos la línea que dibuja la órbita (el rastro que deja)
                 this.trailPositions = [];
                 this.trail = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.3 }));
-                if (name !== "Sol") scene.add(this.trail);
+                scene.add(this.trail);
             }
 
-            // Función para dibujar la línea detrás del planeta mientras avanza
             updateTrail(timeScale) {
-                if (this.name === "Sol" || !showTrails) return;
-                // Solo guarda un punto de vez en cuando para no saturar la memoria
+                if (!showTrails) return;
                 if (Math.abs(timeScale) > 0.01 && Math.random() < 0.2) {
                     this.trailPositions.push(this.mesh.position.clone());
-                    if (this.trailPositions.length > 350) this.trailPositions.shift(); // Borra la cola antigua
+                    if (this.trailPositions.length > 350) this.trailPositions.shift();
                     this.trail.geometry.setFromPoints(this.trailPositions);
                 }
             }
         }
 
-        // ==========================================
-        // 6. CREANDO NUESTRO SISTEMA SOLAR
-        // ==========================================
+        // --- 4. SISTEMA DE REINICIO Y CREACIÓN INICIAL ---
         const bodies = [];
-        // Fabricamos cada cuerpo: Nombre, distancia X, distancia Z, MASA, tamaño, foto.
-        bodies.push(new Body("Sol", 0, 0, 10000, 60, "sunmap.jpg"));
-        bodies.push(new Body("Mercurio", 120, 0, 0.2, 4, "mercurymap.jpg"));
-        bodies.push(new Body("Venus", 180, 0, 0.8, 8, "venusmap.jpg"));
-        bodies.push(new Body("Tierra", 260, 0, 1.0, 9, "earthmap1k.jpg"));
-        bodies.push(new Body("Marte", 340, 0, 0.4, 6, "marsmap1k.jpg"));
-        bodies.push(new Body("Júpiter", 550, 0, 80, 25, "jupitermap.jpg"));
-        bodies.push(new Body("Saturno", 800, 0, 50, 20, "saturnmap.jpg", true));
-        bodies.push(new Body("Urano", 1050, 0, 20, 14, "uranusmap.jpg"));
-        bodies.push(new Body("Neptuno", 1300, 0, 22, 13, "neptunemap.jpg"));
 
-        camera.position.set(0, 400, 800);
+        // Función para poblar el sistema solar por defecto
+        function buildDefaultSolarSystem() {
+            // Borramos los objetos 3D de la escena antes de vaciar la lista (por si acaso)
+            for (let i = 0; i < bodies.length; i++) {
+                scene.remove(bodies[i].mesh);
+                if (bodies[i].ringMesh) scene.remove(bodies[i].ringMesh);
+                scene.remove(bodies[i].trail);
+            }
+            
+            // Vaciamos el arreglo
+            bodies.length = 0;
 
-        // ==========================================
-        // 7. EL MOTOR DE FÍSICA (AQUÍ OCURRE LA MAGIA)
-        // ==========================================
+            // Creamos los cuerpos originales nuevamente
+            bodies.push(new Body("Sol", 0, 0, 10000, 60, "sunmap.jpg"));
+            bodies.push(new Body("Mercurio", 120, 0, 0.2, 4, "mercurymap.jpg"));
+            bodies.push(new Body("Venus", 180, 0, 0.8, 8, "venusmap.jpg"));
+            bodies.push(new Body("Tierra", 260, 0, 1.0, 9, "earthmap1k.jpg"));
+            bodies.push(new Body("Marte", 340, 0, 0.4, 6, "marsmap1k.jpg"));
+            bodies.push(new Body("Júpiter", 550, 0, 80, 25, "jupitermap.jpg"));
+            bodies.push(new Body("Saturno", 800, 0, 50, 20, "saturnmap.jpg", true));
+            bodies.push(new Body("Urano", 1050, 0, 20, 14, "uranusmap.jpg"));
+            bodies.push(new Body("Neptuno", 1300, 0, 22, 13, "neptunemap.jpg"));
+
+            // Reiniciamos cámara y enfoque
+            currentFocusIndex = 0;
+            camera.position.set(0, 400, 800);
+        }
+
+        // Construimos por primera vez
+        buildDefaultSolarSystem();
+
+        // LÓGICA DEL BOTÓN "RESTABLECER SISTEMA"
+        window.resetSystem = () => {
+            if(confirm("¿Seguro que deseas restablecer el simulador? Se borrarán tus ejercicios y los planetas volverán a su estado original.")) {
+                // 1. Restaurar valores globales de física y tiempo
+                G = 0.5;
+                document.getElementById('globalG').value = G;
+                timeScale = 1.0;
+                timeDisplay.innerText = `Velocidad: 1.0x`;
+                
+                // 2. Volver a armar el sistema solar original
+                buildDefaultSolarSystem();
+                
+                // 3. Actualizar la tabla de datos
+                renderTable();
+            }
+        };
+
+        // --- 5. LÓGICA DE INTERFAZ Y CRUD ---
+        
+        const timeDisplay = document.getElementById('timeDisplay');
+        window.changeTime = (amount) => { timeScale += amount; timeDisplay.innerText = `Velocidad: ${timeScale.toFixed(1)}x`; };
+        window.pauseTime = () => { timeScale = 0; timeDisplay.innerText = `Velocidad: 0.0x`; };
+        window.toggleTrails = () => { showTrails = !showTrails; document.getElementById('btnTrails').innerText = showTrails ? "Ocultar Órbitas" : "Mostrar Órbitas"; for (let b of bodies) b.trail.visible = showTrails; };
+        window.updateGlobalG = () => { G = parseFloat(document.getElementById('globalG').value) || 0; };
+
+        const focusDisplay = document.getElementById('focusDisplay');
+        window.changeFocus = (dir) => {
+            if (bodies.length === 0) return;
+            currentFocusIndex += dir;
+            if (currentFocusIndex < 0) currentFocusIndex = bodies.length - 1;
+            if (currentFocusIndex >= bodies.length) currentFocusIndex = 0;
+            focusDisplay.innerText = bodies[currentFocusIndex].name;
+        };
+
+        function renderTable() {
+            let html = '';
+            bodies.forEach((b, i) => {
+                html += `<tr>
+                    <td><strong>${b.name}</strong></td>
+                    <td><input type="number" id="m_${i}" value="${b.mass.toFixed(1)}" onchange="updateBodyData(${i})" step="0.1"></td>
+                    <td><input type="number" id="px_${i}" value="${b.mesh.position.x.toFixed(1)}" onchange="updateBodyData(${i})"></td>
+                    <td><input type="number" id="pz_${i}" value="${b.mesh.position.z.toFixed(1)}" onchange="updateBodyData(${i})"></td>
+                    <td><input type="number" id="vx_${i}" value="${b.vx.toFixed(2)}" onchange="updateBodyData(${i})" step="0.1"></td>
+                    <td><input type="number" id="vz_${i}" value="${b.vz.toFixed(2)}" onchange="updateBodyData(${i})" step="0.1"></td>
+                    <td><button class="btn-delete" onclick="deleteBody(${i})">❌</button></td>
+                </tr>`;
+            });
+            document.getElementById('tableBody').innerHTML = html;
+            
+            if(bodies.length > 0) {
+                if(currentFocusIndex >= bodies.length) currentFocusIndex = 0;
+                focusDisplay.innerText = bodies[currentFocusIndex].name;
+            } else {
+                focusDisplay.innerText = "Ninguno";
+            }
+        }
+
+        function updateTableRealTime() {
+            if (!document.hasFocus() || document.activeElement.tagName !== 'INPUT') {
+                bodies.forEach((b, i) => {
+                    let px = document.getElementById(`px_${i}`); if(px) px.value = b.mesh.position.x.toFixed(1);
+                    let pz = document.getElementById(`pz_${i}`); if(pz) pz.value = b.mesh.position.z.toFixed(1);
+                    let vx = document.getElementById(`vx_${i}`); if(vx) vx.value = b.vx.toFixed(2);
+                    let vz = document.getElementById(`vz_${i}`); if(vz) vz.value = b.vz.toFixed(2);
+                });
+            }
+        }
+
+        window.updateBodyData = (i) => {
+            let b = bodies[i];
+            b.mass = parseFloat(document.getElementById(`m_${i}`).value) || 0;
+            b.mesh.position.x = parseFloat(document.getElementById(`px_${i}`).value) || 0;
+            b.mesh.position.z = parseFloat(document.getElementById(`pz_${i}`).value) || 0;
+            b.vx = parseFloat(document.getElementById(`vx_${i}`).value) || 0;
+            b.vz = parseFloat(document.getElementById(`vz_${i}`).value) || 0;
+            
+            b.trailPositions = [];
+            b.trail.geometry.setFromPoints([]);
+        };
+
+        window.addCustomBody = () => {
+            let name = prompt("Nombre del nuevo planeta/cuerpo:", "Asteroide") || "Cuerpo X";
+            let mass = parseFloat(prompt("Masa del cuerpo:", "1")) || 1;
+            let posX = parseFloat(prompt("Posición en X inicial:", "400")) || 400;
+            let color = Math.random() * 0xffffff;
+            
+            let b = new Body(name, posX, 0, mass, 10, null, false, color);
+            bodies.push(b);
+            renderTable();
+        };
+
+        window.deleteBody = (i) => {
+            if(confirm(`¿Seguro que deseas eliminar a ${bodies[i].name}?`)) {
+                let b = bodies[i];
+                scene.remove(b.mesh);
+                if (b.ringMesh) scene.remove(b.ringMesh);
+                scene.remove(b.trail);
+                bodies.splice(i, 1);
+                renderTable();
+            }
+        };
+
+        renderTable();
+
+        // --- 6. MOTOR FÍSICO Y RENDERIZADO ---
+        let frameCounter = 0;
+
         function updatePhysics() {
-            let dt = baseDt * timeScale; // "dt" es cuánto tiempo pasa en este instante.
-            if (Math.abs(dt) < 0.001) return; // Si estamos en pausa, no calculamos nada.
+            let dt = baseDt * timeScale;
+            if (Math.abs(dt) < 0.001) return;
 
-            // PASO A: Limpiar la mesa. Reiniciamos las fuerzas de todos los planetas a cero.
             for (let i = 0; i < bodies.length; i++) {
                 bodies[i].fx = 0; bodies[i].fy = 0; bodies[i].fz = 0;
             }
 
-            // PASO B: Calcular cómo se atraen entre todos (Gravedad)
             for (let i = 0; i < bodies.length; i++) {
-                // Comparamos el planeta 'i' con el resto de planetas 'j'
                 for (let j = i + 1; j < bodies.length; j++) { 
-                    
-                    // Calculamos qué tan lejos están uno del otro en los ejes X, Y, Z
                     let dx = bodies[j].mesh.position.x - bodies[i].mesh.position.x;
                     let dy = bodies[j].mesh.position.y - bodies[i].mesh.position.y;
                     let dz = bodies[j].mesh.position.z - bodies[i].mesh.position.z;
                     
-                    // Calculamos la distancia real directa (Teorema de Pitágoras en 3D)
                     let distSq = dx*dx + dy*dy + dz*dz;
                     let dist = Math.sqrt(distSq);
                     
-                    // Evitamos calcular si por error chocan y están en el mismo punto exacto
                     if (dist > (bodies[i].radius + bodies[j].radius)) {
-                        
-                        // *** LEY DE GRAVITACIÓN UNIVERSAL DE NEWTON ***
-                        // La fórmula real es F = G * (Masa1 * Masa2) / Distancia al cuadrado
-                        // Esto calcula la potencia del "imán" entre estos dos cuerpos.
-                        let fuerzaTotal = (G * bodies[i].mass * bodies[j].mass) / distSq;
-                        
-                        // Repartimos esa fuerza en las direcciones X, Y y Z
-                        let fx = fuerzaTotal * (dx / dist);
-                        let fy = fuerzaTotal * (dy / dist);
-                        let fz = fuerzaTotal * (dz / dist);
+                        let forceMagnitude = (G * bodies[i].mass * bodies[j].mass) / distSq;
+                        let fx = forceMagnitude * (dx / dist);
+                        let fy = forceMagnitude * (dy / dist);
+                        let fz = forceMagnitude * (dz / dist);
 
-                        // *** TERCERA LEY DE NEWTON (Acción y Reacción) ***
-                        // Si yo te jalo hacia mí con 10kg de fuerza, tú me jalas hacia ti con 10kg de fuerza.
-                        
-                        // El planeta 'i' siente el jalón hacia el planeta 'j' (Sumamos fuerza)
-                        bodies[i].fx += fx; 
-                        bodies[i].fy += fy; 
-                        bodies[i].fz += fz;
-                        
-                        // El planeta 'j' siente el MISMO jalón hacia el planeta 'i' pero al revés (Restamos fuerza)
-                        bodies[j].fx -= fx; 
-                        bodies[j].fy -= fy; 
-                        bodies[j].fz -= fz;
+                        bodies[i].fx += fx; bodies[i].fy += fy; bodies[i].fz += fz;
+                        bodies[j].fx -= fx; bodies[j].fy -= fy; bodies[j].fz -= fz;
                     }
                 }
             }
 
-            // PASO C: Mover los planetas basados en los tirones que sufrieron
             for (let i = 0; i < bodies.length; i++) {
                 let body = bodies[i];
-                
-                // *** SEGUNDA LEY DE NEWTON ***
-                // La aceleración (cambio de velocidad) depende de cuánta fuerza se aplicó y qué tan pesado es el objeto.
-                // Fórmula: Aceleración = Fuerza / Masa (a = F / m)
-                // Es más fácil empujar (acelerar) una bicicleta (poca masa) que un camión (mucha masa).
-                body.ax = body.fx / body.mass;
-                body.ay = body.fy / body.mass;
-                body.az = body.fz / body.mass;
+                if (body.mass > 0) {
+                    body.ax = body.fx / body.mass;
+                    body.ay = body.fy / body.mass;
+                    body.az = body.fz / body.mass;
+                }
 
-                // *** PRIMERA LEY DE NEWTON (Inercia) ***
-                // Un objeto sigue moviéndose en la misma dirección y a la misma velocidad a menos que lo empujen.
-                
-                // 1. Modificamos la velocidad actual sumándole la aceleración por el tiempo transcurrido
                 body.vx += body.ax * dt; 
                 body.vy += body.ay * dt; 
                 body.vz += body.az * dt;
 
-                // 2. Modificamos la posición del planeta sumándole la velocidad
-                // Si la aceleración fuera CERO (ningún planeta lo atrae), 
-                // la velocidad no cambiaría y el planeta se iría en línea recta para siempre.
                 body.mesh.position.x += body.vx * dt;
                 body.mesh.position.y += body.vy * dt;
                 body.mesh.position.z += body.vz * dt;
                 
-                // Hacemos que el planeta gire sobre sí mismo (como los días en la Tierra)
                 body.mesh.rotation.y += 0.01 * dt; 
-                
-                // Dibujamos la estela detrás de él
                 body.updateTrail(timeScale);
             }
             
-            // La bombilla del Sol tiene que moverse si el Sol se mueve
-            sunLight.position.copy(bodies[0].mesh.position);
+            if(bodies.length > 0 && bodies[0].name === "Sol") {
+                sunLight.position.copy(bodies[0].mesh.position);
+            }
         }
 
-        // ==========================================
-        // 8. BUCLE PRINCIPAL (Como una película)
-        // ==========================================
-        // Esta función se repite sin parar, unas 60 veces por segundo
         function animate() {
-            requestAnimationFrame(animate); // Pide al navegador que llame a esta función otra vez
+            requestAnimationFrame(animate);
+            updatePhysics();
             
-            updatePhysics(); // Calculamos el movimiento
-            
-            // Hacemos que la cámara mire siempre al planeta que seleccionamos
-            controls.target.copy(bodies[currentFocusIndex].mesh.position);
+            frameCounter++;
+            if(frameCounter % 10 === 0 && Math.abs(timeScale) > 0) {
+                updateTableRealTime();
+            }
+
+            if(bodies.length > 0) {
+                let targetPos = bodies[currentFocusIndex].mesh.position;
+                controls.target.copy(targetPos);
+            }
             controls.update(); 
-            
-            renderer.render(scene, camera); // Tomamos la "foto" 3D y la mostramos en pantalla
+            renderer.render(scene, camera);
         }
 
-        // Si el usuario cambia el tamaño de la ventana, ajustamos la cámara para que no se deforme
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('dataPanel').style.height = (window.innerHeight * 0.3) + "px";
         });
+        document.getElementById('dataPanel').style.height = (window.innerHeight * 0.3) + "px";
 
-        // ¡Encendemos el motor!
         animate();
     </script>
 </body>
